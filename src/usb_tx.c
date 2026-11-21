@@ -120,6 +120,23 @@ void tx_fifo_service(void) {
     char data[64];
     uint8_t i = 0;
 
+    if (system_config.terminal_usb_enable && !tud_cdc_n_connected(0)) {
+        // No host. TinyUSB does not clear its TX buffer when DTR drops, and nobody
+        // reads it, so write_available stays below 64 for good. Checking that first
+        // left the flush below unreachable: tx_fifo filled and core0 blocked in
+        // printf (button scripts and PSU errors run with no terminal attached).
+        // Drop the stale USB data and, unless the debug UART also carries the
+        // terminal, the pending output and any toolbar update.
+        tud_cdc_n_write_clear(0);
+        if (!system_config.terminal_uart_enable) {
+            spsc_queue_flush(&tx_fifo);
+            tx_tb_buf_ready = false;
+            tx_state = IDLE;
+            delay_count = 0;
+            return;
+        }
+    }
+
     if (system_config.terminal_usb_enable) { // is tinyUSB CDC ready?
         if (tud_cdc_n_write_available(0) < 64) {
             return;
