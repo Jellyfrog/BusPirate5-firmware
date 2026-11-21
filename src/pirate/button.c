@@ -47,13 +47,30 @@ enum button_codes button_check_press(uint8_t button_id) {
     }
     return BP_BUTT_NO_PRESS;
 }
+// The button is active high on RP2040 (pull-down) and active low on RP2350 (pull-up,
+// E9 erratum), so which edge is the press depends on the platform.
+#if RPI_PLATFORM == RP2040
+    #define BUTTON_EDGE_PRESS GPIO_IRQ_EDGE_RISE
+    #define BUTTON_EDGE_RELEASE GPIO_IRQ_EDGE_FALL
+#elif RPI_PLATFORM == RP2350
+    #define BUTTON_EDGE_PRESS GPIO_IRQ_EDGE_FALL
+    #define BUTTON_EDGE_RELEASE GPIO_IRQ_EDGE_RISE
+#endif
+
+// true between a press edge and its release edge
+static volatile bool press_in_progress = false;
+
 // example irq callback handler, copy for your own uses
 void button_irq_callback(uint gpio, uint32_t events) {
-    if (events & GPIO_IRQ_EDGE_RISE) {
+    if (events & BUTTON_EDGE_PRESS) {
         press_start_time = get_absolute_time();
+        press_in_progress = true;
     }
 
-    if (events & GPIO_IRQ_EDGE_FALL) {
+    // Only a release that follows a press counts. A release seen first (button
+    // held through boot or while the IRQ was disabled) has no start time.
+    if ((events & BUTTON_EDGE_RELEASE) && press_in_progress) {
+        press_in_progress = false;
         absolute_time_t press_end_time = get_absolute_time();
         int64_t duration_ms = absolute_time_diff_us(press_start_time, press_end_time) / 1000;
 
@@ -72,6 +89,7 @@ void button_irq_callback(uint gpio, uint32_t events) {
 // enable the irq for button button_id
 void button_irq_enable(uint8_t button_id, gpio_irq_callback_t callback) {
     button_pressed = false;
+    press_in_progress = false; // a button already held is ignored until its next press
     gpio_set_irq_enabled_with_callback(EXT1, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, callback);
 }
 // disable the irq for button button_id
