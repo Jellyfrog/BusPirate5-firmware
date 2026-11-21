@@ -192,7 +192,10 @@ static uint32_t hwi2c_setup_dialog(void) {
     bool interactive = (st == BP_CMD_MISSING);
 
     if (interactive) {
-        if (storage_load_mode(config_file, config_t, count_of(config_t))) {
+        // the file is on the host-writable USB drive: a speed of 0 kHz makes the PIO
+        // clock divider infinite, so only offer the range the prompt accepts
+        if (storage_load_mode(config_file, config_t, count_of(config_t)) &&
+            i2c_mode_config.baudrate >= 1 && i2c_mode_config.baudrate <= 1000) {
             i2c_mode_config.clock_stretch = (clock_stretch != 0);
             printf("\r\n\r\n%s%s%s\r\n", ui_term_color_info(), GET_T(T_USE_PREVIOUS_SETTINGS), ui_term_color_reset());
             hwi2c_settings();

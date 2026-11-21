@@ -225,8 +225,13 @@ static uint32_t hwuart_setup_dialog(void) {
 
     if (interactive) {
 
-        // check for saved config and offer to use it
-        if (storage_load_mode(config_file, config_t, count_of(config_t))) {
+        // check for saved config and offer to use it. The file is on the host-writable
+        // USB drive: uart_set_format() asserts on other frame sizes, a zero baud rate
+        // divides by zero, and hwuart_settings() indexes parity_choices[] by parity.
+        if (storage_load_mode(config_file, config_t, count_of(config_t)) &&
+            mode_config.baudrate > 0 && mode_config.data_bits >= 5 && mode_config.data_bits <= 8 &&
+            mode_config.stop_bits >= 1 && mode_config.stop_bits <= 2 &&
+            mode_config.parity < count_of(parity_choices)) {
             printf("\r\n\r\n%s%s%s\r\n", ui_term_color_info(), GET_T(T_USE_PREVIOUS_SETTINGS), ui_term_color_reset());
             hwuart_settings();
             int r = bp_cmd_yes_no_exit("");
