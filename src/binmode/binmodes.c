@@ -236,6 +236,14 @@ inline void binmode_service(void) {
     if(binmodes[system_config.binmode_select].button_to_exit) {
         char c;
         if(rx_fifo_try_get(&c) || button_get(0)){
+            // The press that exits also reaches the button IRQ, which queues it for the
+            // prompt: once the terminal unlocks it would run the user's button script.
+            // Wait for the release (and its bounce) and discard that press.
+            while (button_get(0)) {
+                tight_loop_contents();
+            }
+            busy_wait_ms(20);
+            button_check_press(0);
             binmode_cleanup();
             system_config.binmode_select = 0;
             binmode_setup();
