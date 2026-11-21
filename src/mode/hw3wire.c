@@ -58,7 +58,22 @@ const bp_command_def_t hw3wire_setup_def = {
     .opts = hw3wire_setup_opts,
 };
 
+static uint32_t hw3wire_setup_dialog(void);
+
+// The dialog and the saved-settings load write straight into mode_config. If the user
+// cancels or a value is rejected, put the previous settings back: the mode may
+// still be running, and later re-inits (e.g. after sniff) would use the
+// half-entered values.
 uint32_t hw3wire_setup(void) {
+    __typeof__(mode_config) saved = mode_config;
+    uint32_t result = hw3wire_setup_dialog();
+    if (!result) {
+        mode_config = saved;
+    }
+    return result;
+}
+
+static uint32_t hw3wire_setup_dialog(void) {
     uint32_t temp;
 
     const char config_file[] = "bp3wire.bp";

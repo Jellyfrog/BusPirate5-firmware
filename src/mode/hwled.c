@@ -227,7 +227,22 @@ const bp_command_def_t led_setup_def = {
     .opts = led_setup_opts,
 };
 
+static uint32_t hwled_setup_dialog(void);
+
+// The dialog and the saved-settings load write straight into hwled_mode_config. If the user
+// cancels or a value is rejected, put the previous settings back: the mode may
+// still be running, and later re-inits (e.g. after sniff) would use the
+// half-entered values.
 uint32_t hwled_setup(void) {
+    __typeof__(hwled_mode_config) saved = hwled_mode_config;
+    uint32_t result = hwled_setup_dialog();
+    if (!result) {
+        hwled_mode_config = saved;
+    }
+    return result;
+}
+
+static uint32_t hwled_setup_dialog(void) {
 
     const char config_file[] = "bpled.bp";
     const mode_config_t config_t[] = {
@@ -244,7 +259,10 @@ uint32_t hwled_setup(void) {
     bool interactive = (st == BP_CMD_MISSING);
 
     if (interactive) {
-        if (storage_load_mode(config_file, config_t, count_of(config_t))) {
+        // device indexes led_devices[] (function pointers); a bad value from the
+        // host-writable USB drive would jump through a wild pointer at setup
+        if (storage_load_mode(config_file, config_t, count_of(config_t)) &&
+            hwled_mode_config.device < count_of(led_devices)) {
             printf("\r\n\r\n%s%s%s\r\n", ui_term_color_info(), GET_T(T_USE_PREVIOUS_SETTINGS), ui_term_color_reset());
             hwled_settings();
             int r = bp_cmd_yes_no_exit("");

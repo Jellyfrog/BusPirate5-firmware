@@ -56,7 +56,22 @@ const bp_command_def_t hw2wire_setup_def = {
     .opts = hw2wire_setup_opts,
 };
 
+static uint32_t hw2wire_setup_dialog(void);
+
+// The dialog and the saved-settings load write straight into hw2wire_mode_config. If the user
+// cancels or a value is rejected, put the previous settings back: the mode may
+// still be running, and later re-inits (e.g. after sniff) would use the
+// half-entered values.
 uint32_t hw2wire_setup(void) {
+    __typeof__(hw2wire_mode_config) saved = hw2wire_mode_config;
+    uint32_t result = hw2wire_setup_dialog();
+    if (!result) {
+        hw2wire_mode_config = saved;
+    }
+    return result;
+}
+
+static uint32_t hw2wire_setup_dialog(void) {
 
     const char config_file[] = "bp2wire.bp";
 

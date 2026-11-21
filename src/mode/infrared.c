@@ -254,7 +254,22 @@ static struct _infrared_mode_config mode_config;
 // Any previous mode may still be running. This is only a configuration step,
 // the user may cancel out of the menu and return to the previous mode.
 // Don't touch hardware yet, save the settings in variables for later.
+static uint32_t infrared_setup_dialog(void);
+
+// The dialog and the saved-settings load write straight into mode_config. If the user
+// cancels or a value is rejected, put the previous settings back: the mode may
+// still be running, and later re-inits (e.g. after sniff) would use the
+// half-entered values.
 uint32_t infrared_setup(void) {
+    __typeof__(mode_config) saved = mode_config;
+    uint32_t result = infrared_setup_dialog();
+    if (!result) {
+        mode_config = saved;
+    }
+    return result;
+}
+
+static uint32_t infrared_setup_dialog(void) {
     uint32_t temp;
 
     const char config_file[] = "bpirrxtx.bp";
