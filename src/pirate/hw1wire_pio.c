@@ -294,6 +294,15 @@ typedef unsigned char byte;
 // global 'crc8' value.
 // Returns current global crc8 value
 //
+// Dallas/Maxim CRC8 step (polynomial 0x8C, Application Note 27) on a caller-owned value.
+static unsigned char crc8_update(unsigned char crc, unsigned char data) {
+    crc ^= data;
+    for (int i = 0; i < 8; ++i) {
+        crc = (crc & 1) ? (crc >> 1) ^ 0x8c : (crc >> 1);
+    }
+    return crc;
+}
+
 unsigned char calc_crc8(unsigned char data) {
     int i;
 
@@ -403,7 +412,8 @@ int OWSearch(struct owobj* search_owobj) {
 
                 // if the mask is 0 then go to new SerialNum byte rom_byte_number and reset mask
                 if (rom_byte_mask == 0) {
-                    calc_crc8(search_owobj->ROM_NO[rom_byte_number]); // accumulate the CRC
+                    // accumulate the CRC in the search object; the check below reads it there
+                    search_owobj->crc8 = crc8_update(search_owobj->crc8, search_owobj->ROM_NO[rom_byte_number]);
                     rom_byte_number++;
                     rom_byte_mask = 1;
                 }
