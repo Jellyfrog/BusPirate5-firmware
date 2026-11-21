@@ -393,6 +393,8 @@ void teardown_uart_glitch_hardware() {
     // kill the timer
     ticker_kill();
 
+    // stop the state machine first: removing its program does not stop it
+    pio_sm_set_enabled(glitch_pio.pio, glitch_pio.sm, false);
     pio_remove_program(glitch_pio.pio, glitch_pio.program, glitch_pio.offset);
 }
 

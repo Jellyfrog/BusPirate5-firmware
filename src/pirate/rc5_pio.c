@@ -67,6 +67,8 @@ int rc5_tx_init(uint pin_num, uint32_t mod_freq) {
 
 void rc5_rx_deinit(uint pin_num) {
     //pio_remove_program_and_unclaim_sm(pio_config_tx.program, pio_config_rx.pio, pio_config_rx.sm, pio_config_rx.offset);
+    // stop the state machine first: removing its program does not stop it
+    pio_sm_set_enabled(pio_config_rx.pio, pio_config_rx.sm, false);
     pio_remove_program(pio_config_rx.pio, pio_config_rx.program, pio_config_rx.offset);
     gpio_set_inover(1u << pin_num, GPIO_OVERRIDE_NORMAL);
     pio_sm_clear_fifos(pio_config_rx.pio, pio_config_rx.sm);
@@ -75,6 +77,9 @@ void rc5_rx_deinit(uint pin_num) {
 
 void rc5_tx_deinit(uint pin_num) {
     //pio_remove_program_and_unclaim_sm(pio_config_tx.program, pio_config_tx.pio, pio_config_tx.sm, pio_config_tx.offset);
+    // stop the state machine first: removing its program does not stop it
+    pio_sm_set_enabled(pio_config_tx.pio, pio_config_tx.sm, false);
+    pio_sm_set_enabled(pio_config_rc5_carrier.pio, pio_config_rc5_carrier.sm, false);
     pio_remove_program(pio_config_tx.pio, pio_config_tx.program, pio_config_tx.offset);
     pio_remove_program(pio_config_rc5_carrier.pio, pio_config_rc5_carrier.program, pio_config_rc5_carrier.offset);
     pio_sm_clear_fifos(pio_config_tx.pio, pio_config_tx.sm);

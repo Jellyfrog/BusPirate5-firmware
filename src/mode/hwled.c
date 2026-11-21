@@ -111,6 +111,8 @@ static uint32_t ws2812_setup_exc(void) {
 }
 
 static void ws2812_cleanup(void) {
+    // stop the state machine first: removing its program does not stop it
+    pio_sm_set_enabled(pio_config.pio, pio_config.sm, false);
     pio_remove_program(pio_config.pio, pio_config.program, pio_config.offset);
 }
 
@@ -153,6 +155,8 @@ static uint32_t apa102_setup_exc(void) {
 }
 
 static void apa102_cleanup(void) {
+    // stop the state machine first: removing its program does not stop it
+    pio_sm_set_enabled(pio_config.pio, pio_config.sm, false);
     pio_remove_program(pio_config.pio, pio_config.program, pio_config.offset);
 }
 
