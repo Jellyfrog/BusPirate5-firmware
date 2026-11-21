@@ -67,6 +67,8 @@ uint32_t time_start, time_end;
 #define BPIO_MAX_WRITE_SIZE 512
 #define BPIO_MAX_READ_SIZE  512
 #define BPIO_MAX_COBS_SIZE BPIO_MAX_PACKET_SIZE+((BPIO_MAX_PACKET_SIZE + 254) / 254) 
+#define BPIO_RX_TIMEOUT_US 500000 // drop a partial request that stops arriving for this long
+#define BPIO_TX_TIMEOUT_US 500000 // give up on a reply the host stops reading for this long
 
 // A helper to simplify creating vectors from C-arrays.
 #define c_vec_len(V) (sizeof(V)/sizeof((V)[0]))
@@ -192,6 +194,7 @@ static inline void send_packet(flatcc_builder_t *B, uint8_t *cobs_buf) {
     if(bpio_debug) printf("[Send Packet] COBS encoded buffer length: %zu\r\n", cobs_len);
 
     uint8_t *buf_ptr = cobs_buf;
+    uint32_t last_progress = time_us_32();
     while (cobs_len) { //80uS
         if (tud_cdc_n_write_available(CDC_INTF) >= 64) {
             uint32_t chunk_size = (cobs_len > 64) ? 64 : cobs_len;
@@ -199,6 +202,14 @@ static inline void send_packet(flatcc_builder_t *B, uint8_t *cobs_buf) {
             tud_cdc_n_write_flush(CDC_INTF);
             buf_ptr += chunk_size;
             cobs_len -= chunk_size;
+            last_progress = time_us_32();
+        } else if (time_us_32() - last_progress > BPIO_TX_TIMEOUT_US) {
+            // The host is not reading (port closed mid-reply, client gone). Waiting
+            // here would hang core0 for good. Drop the rest of this reply and what is
+            // queued, so a client that reopens the port does not get a stale tail first.
+            if(bpio_debug) printf("[Send Packet] Host not reading, dropping %zu bytes\r\n", cobs_len);
+            tud_cdc_n_write_clear(CDC_INTF);
+            return;
         }
     }
 }
@@ -787,12 +798,36 @@ void error_response(const char *error_msg, flatcc_builder_t *B, uint8_t *buf) {
 
 flatcc_builder_t builder, *B;
 
+// Bytes received on the BPIO port that do not yet end in a COBS delimiter. Kept across
+// calls so the service never blocks, and so bytes after a delimiter (the start of the
+// next request) are not thrown away.
+static uint8_t bpio_rx_buf[BPIO_MAX_COBS_SIZE];
+static uint32_t bpio_rx_len = 0;
+static uint32_t bpio_rx_last_us = 0;  // when the partial request last grew
+static bool bpio_rx_discard = false;  // skipping the rest of an oversized request
+
+// remove the first n bytes of the receive buffer
+static void bpio_rx_consume(uint32_t n) {
+    memmove(bpio_rx_buf, &bpio_rx_buf[n], bpio_rx_len - n);
+    bpio_rx_len -= n;
+}
+
 void dirtyproto_mode_setup(void) {
+    static bool builder_ready = false;
     B = &builder;
-    // Initialize the builder
-    if(flatcc_builder_init(B)==-1) {
-        //if(bpio_debug) printf("[BPIO] Error initializing flatcc builder\r\n");
+    // Initialize the builder once; re-initialising on every binmode selection leaked
+    // the previous builder's heap allocations.
+    if (!builder_ready) {
+        if(flatcc_builder_init(B)==-1) {
+            //if(bpio_debug) printf("[BPIO] Error initializing flatcc builder\r\n");
+        } else {
+            builder_ready = true;
+        }
+    } else {
+        flatcc_builder_reset(B);
     }
+    bpio_rx_len = 0;
+    bpio_rx_discard = false;
     #if !USB_QUEUE
     system_config.binmode_usb_rx_queue_enable = false;
     system_config.binmode_usb_tx_queue_enable = false;   
@@ -802,55 +837,56 @@ void dirtyproto_mode_setup(void) {
 // handler needs to be cooperative multitasking until mode is enabled
 void dirtyproto_mode(void) {
     uint8_t buf[BPIO_MAX_COBS_SIZE]; // used to store the flatbuffer data, and for COBS encoded output
-    
-    // Check for async data if no request is pending
-    if (!tud_cdc_n_available(CDC_INTF)) {
-        if(tud_cdc_n_connected(CDC_INTF)){
-            bpio_check_async_data(B, buf);
+
+    // take whatever has arrived, without waiting for the rest of a request
+    if (tud_cdc_n_available(CDC_INTF) && bpio_rx_len < sizeof(bpio_rx_buf)) {
+        uint32_t n = tud_cdc_n_read(CDC_INTF, &bpio_rx_buf[bpio_rx_len], sizeof(bpio_rx_buf) - bpio_rx_len);
+        if (n) {
+            bpio_rx_len += n;
+            bpio_rx_last_us = time_us_32();
         }
-        return; // No data available, exit early
-    } 
+    }
 
-    bpio_debug = (system_config.bpio_debug_enable && tud_cdc_n_connected(0));
-    
-    // Read flatbuffer data
-    uint8_t *buf_ptr = buf;
-    uint32_t len = 0;
-    uint32_t timeout = time_us_32();
-    while (true) {
-        if (tud_cdc_n_available(CDC_INTF)) {
-            // Read up to the maximum buffer size minus the current pointer position
-            uint32_t bytes_remaining = sizeof(buf) - (buf_ptr - buf);
-            uint32_t read_bytes = tud_cdc_n_read(CDC_INTF, buf_ptr, bytes_remaining);
-            len += read_bytes;
-            // search the next read_bytes of the buffer for the COBS delimiter
-            for (uint32_t i = 0; i < read_bytes; i++) {
-                if (buf_ptr[i] == 0x00) { // COBS delimiter
-                    if (bpio_debug) printf("[BPIO] COBS delimiter found, stopping read\r\n");
-                    goto bpio_mode_read_end;
-                }
-            }
+    uint8_t *delimiter = memchr(bpio_rx_buf, 0x00, bpio_rx_len);
 
-            //error if buffer is full
-            if (len >= sizeof(buf)) {
-                if(bpio_debug) printf("[BPIO] Error: Flatbuffer buffer overflow, buffer size %zu\r\n", sizeof(buf));
-                error_response("Flatbuffer buffer overflow", B, buf);
-                return;
-            }
-
-            //advance pointer
-            buf_ptr += read_bytes;
+    if (bpio_rx_discard) {
+        // resynchronise: drop everything up to and including the next delimiter
+        if (delimiter) {
+            bpio_rx_consume((delimiter - bpio_rx_buf) + 1);
+            bpio_rx_discard = false;
+        } else {
+            bpio_rx_len = 0;
         }
-        
-        if (time_us_32() - timeout > 500000) { // Timeout after 500ms
+        return;
+    }
+
+    if (!delimiter) {
+        if (bpio_rx_len == sizeof(bpio_rx_buf)) {
+            if(bpio_debug) printf("[BPIO] Error: Flatbuffer buffer overflow, buffer size %zu\r\n", sizeof(bpio_rx_buf));
+            error_response("Flatbuffer buffer overflow", B, buf);
+            bpio_rx_len = 0;
+            bpio_rx_discard = true; // the rest of this request is still coming
+        } else if (bpio_rx_len && (time_us_32() - bpio_rx_last_us > BPIO_RX_TIMEOUT_US)) {
             if(bpio_debug) printf("[BPIO] Timeout waiting for flatbuffer data\r\n");
             error_response("Timeout waiting for flatbuffer data", B, buf);
-            return;
+            bpio_rx_len = 0;
+        } else if (bpio_rx_len == 0 && tud_cdc_n_connected(CDC_INTF)) {
+            // nothing pending: forward unsolicited data (e.g. UART RX)
+            bpio_check_async_data(B, buf);
         }
-    } 
+        return;
+    }
 
-bpio_mode_read_end:           
-    if(bpio_debug) printf("[BPIO] Flatbuffer data read complete, total length: %d\r\n", len);
+    bpio_debug = (system_config.bpio_debug_enable && tud_cdc_n_connected(0));
+
+    // take one complete frame, delimiter included, and keep anything after it
+    uint32_t len = (delimiter - bpio_rx_buf) + 1;
+    memcpy(buf, bpio_rx_buf, len);
+    bpio_rx_consume(len);
+    if (len == 1) {
+        return; // a lone delimiter, nothing to decode
+    }
+    if (bpio_debug) printf("[BPIO] Flatbuffer data read complete, total length: %d\r\n", len);
 
     // nanocobs decode the buffer
     size_t decoded_len;
@@ -862,7 +898,7 @@ bpio_mode_read_end:
     }
     
     // Verify the flatbuffer packet (this will throw an error if invalid)
-    int ret = bpio_RequestPacket_verify_as_root(buf, sizeof(buf)); 
+    int ret = bpio_RequestPacket_verify_as_root(buf, decoded_len); 
     if(ret){
         if(bpio_debug){
             printf("[BPIO] Error: Invalid flatbuffer, verify returned %s\r\n", flatcc_verify_error_string(ret));
