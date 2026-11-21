@@ -154,16 +154,35 @@ const bp_command_def_t i2c_setup_def = {
     .opts = i2c_setup_opts,
 };
 
+static uint32_t hwi2c_setup_dialog(void);
+
+// The dialog and the saved-settings load write straight into i2c_mode_config. If the user
+// cancels or a value is rejected, put the previous settings back: the mode may
+// still be running, and later re-inits (e.g. after sniff) would use the
+// half-entered values.
 uint32_t hwi2c_setup(void) {
+    __typeof__(i2c_mode_config) saved = i2c_mode_config;
+    uint32_t result = hwi2c_setup_dialog();
+    if (!result) {
+        i2c_mode_config = saved;
+    }
+    return result;
+}
+
+static uint32_t hwi2c_setup_dialog(void) {
     uint32_t temp;
 
     const char config_file[] = "bpi2c.bp";
+
+    // Storage reads and writes uint32_t. clock_stretch is a bool, and pointing storage
+    // at it overwrote the three fields after it (ack_pending, read, start_sent).
+    uint32_t clock_stretch = i2c_mode_config.clock_stretch;
 
     const mode_config_t config_t[] = {
         // clang-format off
         { "$.baudrate", &i2c_mode_config.baudrate, MODE_CONFIG_FORMAT_DECIMAL },
         /*{ "$.data_bits", &i2c_mode_config.data_bits, MODE_CONFIG_FORMAT_DECIMAL },*/
-        { "$.clock_stretch", (uint32_t*)&i2c_mode_config.clock_stretch, MODE_CONFIG_FORMAT_DECIMAL },
+        { "$.clock_stretch", &clock_stretch, MODE_CONFIG_FORMAT_DECIMAL },
         // clang-format on
     };
 
@@ -174,6 +193,7 @@ uint32_t hwi2c_setup(void) {
 
     if (interactive) {
         if (storage_load_mode(config_file, config_t, count_of(config_t))) {
+            i2c_mode_config.clock_stretch = (clock_stretch != 0);
             printf("\r\n\r\n%s%s%s\r\n", ui_term_color_info(), GET_T(T_USE_PREVIOUS_SETTINGS), ui_term_color_reset());
             hwi2c_settings();
             int r = bp_cmd_yes_no_exit("");
@@ -191,6 +211,7 @@ uint32_t hwi2c_setup(void) {
         i2c_mode_config.clock_stretch = (bool)temp;
     }
 
+    clock_stretch = i2c_mode_config.clock_stretch;
     storage_save_mode(config_file, config_t, count_of(config_t));
     return 1;
 }

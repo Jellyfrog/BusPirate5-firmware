@@ -129,7 +129,22 @@ const bp_command_def_t spi_setup_def = {
     .opts = spi_setup_opts,
 };
 
+static uint32_t spi_setup_dialog(void);
+
+// The dialog and the saved-settings load write straight into mode_config. If the user
+// cancels or a value is rejected, put the previous settings back: the mode may
+// still be running, and later re-inits (e.g. after sniff) would use the
+// half-entered values.
 uint32_t spi_setup(void) {
+    __typeof__(mode_config) saved = mode_config;
+    uint32_t result = spi_setup_dialog();
+    if (!result) {
+        mode_config = saved;
+    }
+    return result;
+}
+
+static uint32_t spi_setup_dialog(void) {
     uint32_t temp;
 
     const char config_file[] = "bpspi.bp";
@@ -150,7 +165,11 @@ uint32_t spi_setup(void) {
     bool interactive = (st == BP_CMD_MISSING);
 
     if (interactive) {
-        if (storage_load_mode(config_file, config_t, count_of(config_t))) {
+        // the file is on the host-writable USB drive: only offer values the hardware
+        // takes (spi_set_format() asserts on others, spi_settings() indexes by them)
+        if (storage_load_mode(config_file, config_t, count_of(config_t)) &&
+            mode_config.baudrate > 0 && mode_config.data_bits >= 4 && mode_config.data_bits <= 16 &&
+            mode_config.clock_polarity <= 1 && mode_config.clock_phase <= 1 && mode_config.cs_idle <= 1) {
             printf("\r\n\r\n%s%s%s\r\n", ui_term_color_info(), GET_T(T_USE_PREVIOUS_SETTINGS), ui_term_color_reset());
             spi_settings();
             int r = bp_cmd_yes_no_exit("");
@@ -163,7 +182,6 @@ uint32_t spi_setup(void) {
 
         if (bp_cmd_prompt(&spi_databits_range, &temp) != BP_CMD_OK) return 0;
         mode_config.data_bits = (uint8_t)temp;
-        system_config.num_bits = (uint8_t)temp;
 
         if (bp_cmd_prompt(&spi_polarity_choice, &temp) != BP_CMD_OK) return 0;
         mode_config.clock_polarity = (uint8_t)temp;
@@ -180,7 +198,6 @@ uint32_t spi_setup(void) {
         st = bp_cmd_flag(&spi_setup_def, 'd', &temp);
         if (st == BP_CMD_INVALID) return 0;
         mode_config.data_bits = (uint8_t)temp;
-        system_config.num_bits = (uint8_t)temp;
 
         st = bp_cmd_flag(&spi_setup_def, 'o', &temp);
         if (st == BP_CMD_INVALID) return 0;
@@ -214,6 +231,9 @@ uint32_t spi_setup_exc(void) {
     mode_config.read_with_write = false;
     mode_config.baudrate_actual = spi_init(M_SPI_PORT, mode_config.baudrate);
     hwspi_init(mode_config.data_bits, mode_config.clock_polarity, mode_config.clock_phase, mode_config.cs_idle);
+    // Set here rather than in the dialog: saved settings and BPIO2 skip the dialog,
+    // and a cancelled dialog must not change it.
+    system_config.num_bits = mode_config.data_bits;
     system_bio_update_purpose_and_label(true, M_SPI_CLK, BP_PIN_MODE, pin_labels[0]);
     system_bio_update_purpose_and_label(true, M_SPI_CDO, BP_PIN_MODE, pin_labels[1]);
     system_bio_update_purpose_and_label(true, M_SPI_CDI, BP_PIN_MODE, pin_labels[2]);
@@ -230,6 +250,8 @@ void spi_cleanup(void) {
     system_bio_update_purpose_and_label(false, M_SPI_CDO, BP_PIN_MODE, 0);
     system_bio_update_purpose_and_label(false, M_SPI_CDI, BP_PIN_MODE, 0);
     system_bio_update_purpose_and_label(false, M_SPI_CS, BP_PIN_MODE, 0);
+    // the next mode expects 8-bit syntax values, not SPI's data width
+    system_config.num_bits = 8;
 }
 
 bool spi_preflight_sanity_check(void){

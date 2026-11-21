@@ -101,7 +101,22 @@ static bool update_pio_frequency(uint32_t sample_freq, bool enable) {
 // Any previous mode may still be running. This is only a configuration step,
 // the user may cancel out of the menu and return to the previous mode.
 // Don't touch hardware yet, save the settings in variables for later.
+static uint32_t i2s_setup_dialog(void);
+
+// The dialog and the saved-settings load write straight into i2s_mode_config. If the user
+// cancels or a value is rejected, put the previous settings back: the mode may
+// still be running, and later re-inits (e.g. after sniff) would use the
+// half-entered values.
 uint32_t i2s_setup(void) {
+    __typeof__(i2s_mode_config) saved = i2s_mode_config;
+    uint32_t result = i2s_setup_dialog();
+    if (!result) {
+        i2s_mode_config = saved;
+    }
+    return result;
+}
+
+static uint32_t i2s_setup_dialog(void) {
     uint32_t new_freq;
     uint32_t new_bits;
 

@@ -108,7 +108,22 @@ const bp_command_def_t hduart_setup_def = {
     .opts = hduart_setup_opts,
 };
 
+static uint32_t hwhduart_setup_dialog(void);
+
+// The dialog and the saved-settings load write straight into mode_config. If the user
+// cancels or a value is rejected, put the previous settings back: the mode may
+// still be running, and later re-inits (e.g. after sniff) would use the
+// half-entered values.
 uint32_t hwhduart_setup(void) {
+    __typeof__(mode_config) saved = mode_config;
+    uint32_t result = hwhduart_setup_dialog();
+    if (!result) {
+        mode_config = saved;
+    }
+    return result;
+}
+
+static uint32_t hwhduart_setup_dialog(void) {
     uint32_t temp;
     periodic_attributes.has_value = true;
     periodic_attributes.has_dot = false;
