@@ -98,6 +98,8 @@ int irio_pio_rx_init(uint pin_num){
 void irio_pio_rx_deinit(uint pin_num){
     pio_config_release(&pio_config_rx_mark);
     pio_config_release(&pio_config_rx_space);
+    // loaded by _irio_pio_rx_init() too, on the logic analyzer's PIO
+    pio_config_release(&pio_config_rx_mod_freq);
 }
 
 //wait for end of transmission
