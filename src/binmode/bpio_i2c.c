@@ -15,7 +15,7 @@ uint32_t bpio_hwi2c_transaction(struct bpio_data_request_t *request, flatbuffers
     
     if(request->start_main||request->start_alt) {
         if(request->debug) printf("[I2C] START\r\n");
-        if(pio_i2c_start_timeout(timeout)) return HWI2C_TIMEOUT;
+        if(pio_i2c_start_timeout(timeout)) { i2c_result = HWI2C_TIMEOUT; goto i2c_bpio_error; }
     }
 
     if(request->bytes_write > 1 || (request->bytes_read == 0 && request->bytes_write > 0)) {
@@ -24,14 +24,14 @@ uint32_t bpio_hwi2c_transaction(struct bpio_data_request_t *request, flatbuffers
         for(uint32_t i = 0; i < request->bytes_write; i++) {
             // send txbuf[0] (i2c address) with the last bit low
             if(i ==0 && (request->start_main||request->start_alt)) {
-                if(request->debug) printf("[I2C] Write address 0x%02X\r\n", request->data_buf[0]&~0b1);
+                if(request->debug) printf("[I2C] Write address 0x%02X\r\n", flatbuffers_uint8_vec_at(data_write, 0)&~0b1);
                 // if we have a start condition, we need to write the address with the last bit low
                 i2c_result = pio_i2c_write_timeout(flatbuffers_uint8_vec_at(data_write, 0)&~0b1, timeout);
-                if(i2c_result != HWI2C_OK) return i2c_result;
+                if(i2c_result != HWI2C_OK) goto i2c_bpio_error;
             }else{
                 // if we have no start condition, we write the data as is
                 i2c_result = pio_i2c_write_timeout(flatbuffers_uint8_vec_at(data_write, i), timeout);
-                if(i2c_result != HWI2C_OK) return i2c_result;
+                if(i2c_result != HWI2C_OK) goto i2c_bpio_error;
             }
         }
 
@@ -41,7 +41,7 @@ uint32_t bpio_hwi2c_transaction(struct bpio_data_request_t *request, flatbuffers
         }
         if(request->debug) printf("[I2C] RESTART\r\n");
         // if we have read data, we need to restart
-        if(pio_i2c_restart_timeout(timeout)) return HWI2C_TIMEOUT;
+        if(pio_i2c_restart_timeout(timeout)) { i2c_result = HWI2C_TIMEOUT; goto i2c_bpio_error; }
 
     }
 
@@ -51,10 +51,10 @@ uint32_t bpio_hwi2c_transaction(struct bpio_data_request_t *request, flatbuffers
     }
 
     if(request->start_main || request->start_alt) {
-        if(request->debug) printf("[I2C] Read address 0x%02X\r\n", request->data_buf[0]|0b1);
+        if(request->debug) printf("[I2C] Read address 0x%02X\r\n", flatbuffers_uint8_vec_at(data_write, 0)|0b1);
         //send the read address with the last bit high
         i2c_result = pio_i2c_write_timeout(flatbuffers_uint8_vec_at(data_write, 0)|0b1, timeout);
-        if(i2c_result != HWI2C_OK) return i2c_result;
+        if(i2c_result != HWI2C_OK) goto i2c_bpio_error;
     }
     
 
@@ -64,16 +64,24 @@ uint32_t bpio_hwi2c_transaction(struct bpio_data_request_t *request, flatbuffers
     bool ack_all = !(request->stop_main || request->stop_alt);
     for(uint32_t i = 0; i<request->bytes_read; i++) {
         i2c_result = pio_i2c_read_timeout((uint8_t*)&data_read[i], ack_all || (i<(request->bytes_read-1)), timeout);
-        if(i2c_result != HWI2C_OK) return i2c_result;
+        if(i2c_result != HWI2C_OK) goto i2c_bpio_error;
     }
 
     // stop and wait for PIO to be idle
 i2c_bpio_cleanup:
     if(request->stop_main || request->stop_alt) {
         if(request->debug) printf("[I2C] STOP\r\n");
-        if (pio_i2c_stop_timeout(timeout)) return HWI2C_TIMEOUT;
+        if (pio_i2c_stop_timeout(timeout)) { request->error = "I2C timeout"; return HWI2C_TIMEOUT; }
     }
     // Wait for PIO to be idle
     //if (pio_i2c_wait_idle_extern(timeout)) return HWI2C_TIMEOUT;
     return HWI2C_OK;
+
+i2c_bpio_error:
+    // A NACK or timeout ends the transaction. Release the bus with a STOP so the
+    // next request does not start on a bus that is still held mid-transaction.
+    request->error = (i2c_result == HWI2C_NACK) ? "I2C NACK" : "I2C timeout";
+    if(request->debug) printf("[I2C] %s, sending STOP\r\n", request->error);
+    pio_i2c_stop_timeout(timeout);
+    return i2c_result;
 }
