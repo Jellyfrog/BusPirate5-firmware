@@ -669,13 +669,13 @@ uint32_t data_request(bpio_RequestPacket_table_t packet, flatcc_builder_t *B, ui
 
     bpio_handler_func_t bpio_handler = bpio_mode_handlers[system_config.mode].bpio_handler;
     if(NULL == bpio_handler) {
-        bpio_DataResponse_data_read_truncate(B, 0);
+        bpio_DataResponse_data_read_truncate(B, data_buf_size); // drop the reserved bytes, they hold no data
         static const char *no_handler_error_msg = "No BPIO handler for current mode";
         if(bpio_debug) printf("[Data Request] Error: %s\r\n", no_handler_error_msg);
         error = no_handler_error_msg;
     }
     else if(bpio_handler(&request, data_write, data_read)){
-        bpio_DataResponse_data_read_truncate(B, 0); 
+        bpio_DataResponse_data_read_truncate(B, data_buf_size); // drop the reserved bytes, they hold no data 
         static const char* request_error_msg = "Protocol request failed";
         if(bpio_debug) printf("[Data Request] %s\r\n", request_error_msg);
         error = request_error_msg;
