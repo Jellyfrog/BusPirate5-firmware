@@ -49,6 +49,9 @@ int irio_pio_tx_init(uint pin_num, uint32_t mod_freq){
 }
 
 void irio_pio_tx_deinit(uint pin_num){
+    // stop the state machine first: removing its program does not stop it
+    pio_sm_set_enabled(pio_config_tx.pio, pio_config_tx.sm, false);
+    pio_sm_set_enabled(pio_config_tx_carrier.pio, pio_config_tx_carrier.sm, false);
     pio_remove_program(pio_config_tx.pio, pio_config_tx.program, pio_config_tx.offset);
     pio_remove_program(pio_config_tx_carrier.pio, pio_config_tx_carrier.program, pio_config_tx_carrier.offset);
     pio_sm_clear_fifos(pio_config_tx.pio, pio_config_tx.sm);
@@ -100,6 +103,9 @@ int irio_pio_rx_init(uint pin_num){
 }
 
 void irio_pio_rx_deinit(uint pin_num){
+    // stop the state machine first: removing its program does not stop it
+    pio_sm_set_enabled(pio_config_rx_mark.pio, pio_config_rx_mark.sm, false);
+    pio_sm_set_enabled(pio_config_rx_space.pio, pio_config_rx_space.sm, false);
     pio_remove_program(pio_config_rx_mark.pio, pio_config_rx_mark.program, pio_config_rx_mark.offset);
     pio_remove_program(pio_config_rx_space.pio, pio_config_rx_space.program, pio_config_rx_space.offset);
     pio_sm_clear_fifos(pio_config_rx_mark.pio, pio_config_rx_mark.sm);
