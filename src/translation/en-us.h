@@ -153,6 +153,7 @@ static char const * const en_us[]={
 	[T_UART_OPEN_WITH_READ]="UART OPEN (ASYNC READ)",
 	[T_UART_CLOSE]="UART CLOSE",
 	[T_UART_NO_DATA_READ]="No data to read",
+	[T_UART_TX_BLOCKED]="UART TX blocked: CTS not asserted (check flow control wiring)",
 	[T_UART_NO_DATA_TIMEOUT]="Data read timeout",
     //I2C
 	[T_HWI2C_SPEED_MENU]="I2C speed",

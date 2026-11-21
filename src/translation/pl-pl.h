@@ -155,6 +155,7 @@ static char const * const pl_pl[T_LAST_ITEM_ALWAYS_AT_THE_END]={
     [ T_UART_OPEN_WITH_READ            ] = "UART OTWARTY (ASYNC READ)",
     [ T_UART_CLOSE                     ] = "UART ZAMKNIĘTY",
     [ T_UART_NO_DATA_READ              ] = "Brak danych do odczytu",
+    [ T_UART_TX_BLOCKED                ] = NULL,
     [ T_UART_NO_DATA_TIMEOUT           ] = "Odczyt danych przekroczył limit czasu",
     [ T_HWI2C_SPEED_MENU               ] = "Prędkość I2C",
     [ T_HWI2C_SPEED_MENU_1             ] = "1kHz do 1000kHz",
