@@ -55,6 +55,13 @@ bool bpio_hwuart_configure(bpio_mode_configuration_t *bpio_mode_config){
         bpio_mode_config->parity ? 'E' : 'N',
         bpio_mode_config->stop_bits);
     
+    // checked before anything is stored: a zero baud rate divides by zero in
+    // uart_init(), and uart_set_format() asserts on other frame sizes
+    if(bpio_mode_config->speed == 0 || bpio_mode_config->data_bits < 5 || bpio_mode_config->data_bits > 8 ||
+       bpio_mode_config->stop_bits < 1 || bpio_mode_config->stop_bits > 2) {
+        if(bpio_mode_config->debug) printf("[UART] Invalid speed, data bits (5-8) or stop bits (1-2)\r\n");
+        return false;
+    }
     mode_config.baudrate = bpio_mode_config->speed;
     mode_config.data_bits = bpio_mode_config->data_bits;
     mode_config.stop_bits = bpio_mode_config->stop_bits;

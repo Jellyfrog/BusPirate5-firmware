@@ -37,6 +37,12 @@ uint32_t hiz_setup(void);
 uint32_t hiz_setup_exec(void);
 
 /**
+ * @brief Return all IO pins to safe inputs and clear PWM/frequency/aux state.
+ * @details Same as hiz_setup_exec() without turning off the PSU or pull-ups.
+ */
+void hiz_release_pins(void);
+
+/**
  * @brief Display HiZ mode help information.
  */
 void hiz_help(void);

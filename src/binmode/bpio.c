@@ -158,14 +158,19 @@ bool mode_change_new(const char *mode_name, bpio_mode_configuration_t *mode_conf
                 if(bpio_debug) printf("[Mode Change] Protocol %s does not support BPIO handler\r\n", mode_name);
                 return true;
             }
-            modes[system_config.mode].protocol_cleanup();
-            system_config.mode = i;
-            if(bpio_mode_handlers[system_config.mode].bpio_configure==NULL) {
+            // Configure first: a rejected configuration leaves the current mode running.
+            if(bpio_mode_handlers[i].bpio_configure==NULL) {
                 if(bpio_debug) printf("[Mode Change] Protocol %s does not support BPIO configuration\r\n", mode_name);
-            }else{
-                bpio_mode_handlers[system_config.mode].bpio_configure(mode_config);
+            }else if(!bpio_mode_handlers[i].bpio_configure(mode_config)) {
+                if(bpio_debug) printf("[Mode Change] Invalid configuration for %s\r\n", mode_name);
+                return true;
             }
-            modes[system_config.mode].protocol_setup_exc();
+            // Same transition as the terminal, but the PSU and pull-ups stay as they are:
+            // BPIO clients set them in the same request or rely on them staying up.
+            if(!mode_transition(i, true)) {
+                if(bpio_debug) printf("[Mode Change] Setup failed for %s, now in HiZ\r\n", mode_name);
+                return true;
+            }
             return false;
         }
     }
@@ -410,7 +415,7 @@ uint32_t configuration_request(bpio_RequestPacket_table_t packet, flatcc_builder
         mode_config_data.debug = bpio_debug;
         
         if (mode_change_new(mode_str, &mode_config_data)) {
-            static const char *mode_error_msg = "Invalid mode name";
+            static const char *mode_error_msg = "Invalid mode name or configuration";
             if(bpio_debug) printf("[Config Request] Error: %s '%s'\r\n", mode_error_msg, mode_str);
             error = mode_error_msg;
             goto config_response_error;

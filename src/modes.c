@@ -20,6 +20,7 @@
 #include "modes.h"
 
 #include "mode/hiz.h"
+#include "binmode/fala.h"
 #ifdef BP_USE_HW1WIRE
 #include "mode/hw1wire.h"
 #endif
@@ -764,3 +765,27 @@ struct _mode modes[] = {
  * For VIM:
  * vim:set softtabstop=4 shiftwidth=4 tabstop=4:
  */
+
+bool mode_transition(uint32_t new_mode, bool keep_power) {
+    modes[system_config.mode].protocol_cleanup();
+    if (keep_power) {
+        hiz_release_pins();
+    } else {
+        modes[HIZ].protocol_setup_exc(); // pins safe, PSU, pull-ups and aux off
+    }
+    system_config.mode = new_mode;
+    bool ok = true;
+    if (new_mode != HIZ && !modes[new_mode].protocol_setup_exc()) {
+        // undo whatever the failed setup claimed before falling back to HiZ
+        modes[new_mode].protocol_cleanup();
+        if (keep_power) {
+            hiz_release_pins();
+        } else {
+            modes[HIZ].protocol_setup_exc();
+        }
+        system_config.mode = HIZ;
+        ok = false;
+    }
+    fala_mode_change_hook(); // notify follow along logic analyzer
+    return ok;
+}

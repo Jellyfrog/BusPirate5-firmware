@@ -388,6 +388,12 @@ uint32_t spi_get_speed(void) {
 
 bool bpio_hwspi_configure(bpio_mode_configuration_t *bpio_mode_config){
     if(bpio_mode_config->debug) printf("[SPI] Speed %d Hz\r\n", bpio_mode_config->speed);
+    // checked before anything is stored: spi_set_format() asserts on data bits outside
+    // 4-16, and a zero speed gives a zero clock divider
+    if(bpio_mode_config->speed == 0 || bpio_mode_config->data_bits < 4 || bpio_mode_config->data_bits > 16) {
+        if(bpio_mode_config->debug) printf("[SPI] Invalid speed or data bits (4-16)\r\n");
+        return false;
+    }
     mode_config.baudrate=bpio_mode_config->speed; // convert to kHz
     mode_config.data_bits = bpio_mode_config->data_bits;
     mode_config.clock_polarity = bpio_mode_config->clock_polarity;

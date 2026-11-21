@@ -37,18 +37,24 @@ uint32_t hiz_setup(void) {
     return 1;
 }
 
-// this is called duringmode changes; takes care pwm, vpu and psu is turned off, also AUX to input
-uint32_t hiz_setup_exec(void) {
-    // turn everything off
+// Make every IO pin a safe input and forget PWM, frequency and aux outputs.
+// Leaves the PSU and pull-ups as they are.
+void hiz_release_pins(void) {
     bio_init();        // make all pins safe
-    psucmd_disable();  // turn off power supply
-    pullups_disable(); // deactivate
     system_config.freq_active = 0;
     system_config.pwm_active = 0;
     system_config.aux_active = 0;
     for (int i = 0; i < count_of(bio2bufiopin); i++) {
         system_bio_update_purpose_and_label(false, i, BP_PIN_IO, 0);
     }
+}
+
+// this is called duringmode changes; takes care pwm, vpu and psu is turned off, also AUX to input
+uint32_t hiz_setup_exec(void) {
+    // turn everything off
+    hiz_release_pins();
+    psucmd_disable();  // turn off power supply
+    pullups_disable(); // deactivate
     return 1;
 }
 

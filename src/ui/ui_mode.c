@@ -171,15 +171,9 @@ void ui_mode_enable_args(struct command_result* res) {
     // Run mode setup dialog (may prompt for params)
     if (!modes[mode].protocol_setup()) return;
 
-    modes[system_config.mode].protocol_cleanup();   // switch to HiZ
-    modes[HIZ].protocol_setup_exc();                  // disables power supply etc.
-    system_config.mode = mode;                      // setup the new mode
-    if (!modes[system_config.mode].protocol_setup_exc()) {
-        printf("\r\nFailed to setup mode %s", modes[system_config.mode].protocol_name);
-        modes[HIZ].protocol_setup_exc();
-        system_config.mode = 0;
+    if (!mode_transition(mode, false)) {
+        printf("\r\nFailed to setup mode %s", modes[mode].protocol_name);
     }
-    fala_mode_change_hook();                        // notify follow along logic analyzer
 }
 
 /*
