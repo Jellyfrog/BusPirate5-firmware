@@ -472,3 +472,17 @@ void hwuart_wait_done(void) {
 uint32_t hwuart_get_speed(void) {
     return mode_config.baudrate_actual;
 }
+
+uint32_t hwuart_set_speed_temporary(uint32_t baudrate) {
+    // mode_config.baudrate is left alone so hwuart_restore_speed() can go back to it
+    mode_config.baudrate_actual = uart_set_baudrate(M_UART_PORT, baudrate);
+    return mode_config.baudrate_actual;
+}
+
+bool hwuart_flow_control_enabled(void) {
+    return mode_config.flow_control;
+}
+
+void hwuart_restore_speed(void) {
+    mode_config.baudrate_actual = uart_set_baudrate(M_UART_PORT, mode_config.baudrate);
+}

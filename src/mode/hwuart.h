@@ -118,6 +118,23 @@ void hwuart_wait_done(void);
 uint32_t hwuart_get_speed(void);
 
 /**
+ * @brief Change the UART baud rate without changing the configured rate.
+ * @param baudrate  New baud rate
+ * @return Actual baud rate set
+ */
+uint32_t hwuart_set_speed_temporary(uint32_t baudrate);
+
+/**
+ * @brief Return to the baud rate configured for the mode.
+ */
+void hwuart_restore_speed(void);
+
+/**
+ * @brief Whether RTS/CTS flow control is configured (IO6/IO7 belong to the UART).
+ */
+bool hwuart_flow_control_enabled(void);
+
+/**
  * @brief Perform UART mode sanity checks.
  * @return true if all checks pass, false otherwise
  */
