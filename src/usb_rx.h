@@ -41,6 +41,8 @@ void rx_fifo_add(char* c);
  * @return   true if character available
  */
 bool rx_fifo_try_get(char* c);
+// true once per serial BREAK received from the host on the terminal port
+bool usb_cdc_terminal_break_take(void);
 
 /**
  * @brief Get character from FIFO (blocking).

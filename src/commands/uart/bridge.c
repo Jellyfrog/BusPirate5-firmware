@@ -16,10 +16,12 @@
 #include "usb_tx.h"
 #include "lib/bp_args/bp_cmd.h"
 #include "ui/ui_toolbar.h"
+#include "tusb.h"
+#include "binmode/binmodes.h"
 
 static const char* const usage[] = { "bridge\t[-h(elp)] [-t(oolbar)]",
                                      "Transparent UART bridge:%s bridge",
-                                     "Exit:%s press Bus Pirate button" };
+                                     "Exit:%s press Bus Pirate button, send a serial BREAK, or send a BPIO2 request" };
 
 static const bp_command_opt_t bridge_opts[] = {
     { "toolbar", 't', BP_ARG_NONE, NULL, T_HELP_UART_BRIDGE_TOOLBAR },
@@ -53,6 +55,7 @@ void uart_bridge_handler(struct command_result* res) {
 
     printf("%s%s%s\r\n", ui_term_color_notice(), GET_T(T_HELP_UART_BRIDGE_EXIT), ui_term_color_reset());
     bio_put(M_UART_RTS, 0);
+    usb_cdc_terminal_break_take(); // ignore a BREAK that arrived before the bridge started
     while (true) {
         char c;
         if (rx_fifo_try_get(&c)) {
@@ -64,6 +67,15 @@ void uart_bridge_handler(struct command_result* res) {
         }
         // exit when button pressed.
         if (button_get(0)) {
+            break;
+        }
+        // exit when the host sends a serial BREAK on the terminal port
+        if (usb_cdc_terminal_break_take()) {
+            break;
+        }
+        // The bridge blocks the core0 loop, so BPIO2 requests are not serviced while it
+        // runs. Exit when one arrives; it is left unread for the BPIO2 handler.
+        if (system_config.binmode_select == BINMODE_USE_DIRTYPROTO && tud_cdc_n_available(1)) {
             break;
         }
     }
