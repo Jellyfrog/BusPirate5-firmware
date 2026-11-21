@@ -887,7 +887,7 @@ bpio_mode_read_end:
 
     uint8_t packet_type = bpio_RequestPacket_contents_type_get(packet);
     if(bpio_debug) printf("[BPIO] Packet Type: %d\r\n", packet_type);
-    if(packet_type >= count_of(bpio_handlers) && bpio_handlers[packet_type].func) {
+    if(packet_type >= count_of(bpio_handlers) || bpio_handlers[packet_type].func == NULL) {
         error_response("Unknown packet type received", B, buf);
         return;
     }
