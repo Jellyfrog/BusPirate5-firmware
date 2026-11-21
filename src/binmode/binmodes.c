@@ -274,6 +274,13 @@ void binmode_load_save_config(bool save) {
         storage_save_mode(config_file, config_t, count_of(config_t));
     } else {
         storage_load_mode(config_file, config_t, count_of(config_t));
+        // The file lives on the USB drive the host can write, and the binmode table
+        // has been reordered between releases. Only accept an index that exists and
+        // names a binmode that can be saved as the default; anything else could call
+        // past the end of binmodes[] or start a mode that powers VOUT at boot.
+        if (binmode_select >= count_of(binmodes) || !binmodes[binmode_select].can_save_config) {
+            binmode_select = 0;
+        }
         system_config.binmode_select = binmode_select;
     }
 }
