@@ -105,13 +105,7 @@ void logic_analyser_done(void) {
     if(irq_handler_installed){
         irq_remove_handler(PIO0_IRQ_0 + (PIO_NUM(pio_config.pio) * 2), logic_analyser_done);
     }
-    pio_sm_set_enabled(pio_config.pio, pio_config.sm, false);
-
-    if (pio_config.program) {
-        // pio_remove_program_and_unclaim_sm(pio_config.program, pio_config.pio, pio_config.sm, pio_config.offset);
-        pio_remove_program(pio_config.pio, pio_config.program, pio_config.offset);
-        pio_config.program = 0;
-    }
+    pio_config_release(&pio_config); // no-op when nothing is loaded
 
     busy_wait_ms(1);
 
@@ -205,11 +199,7 @@ uint32_t logic_analyzer_configure(
     // This can be useful for debugging. The position of sampling always start at the beginning of the buffer
     // restart_dma(); //this moved to below because the PIO isn't yet assigned
 
-    if (pio_config.program) {
-        // pio_remove_program_and_unclaim_sm(pio_config.program, pio_config.pio, pio_config.sm, pio_config.offset);
-        pio_remove_program(pio_config.pio, pio_config.program, pio_config.offset);
-        pio_config.program = 0;
-    }
+    pio_config_release(&pio_config); // stop and free a previous capture's program
 
     uint8_t trigger_pin = 0;
     bool trigger_ok = false;
@@ -289,11 +279,7 @@ bool logic_analyzer_cleanup(void) {
     dma_channel_unclaim(la_dma_control_channel);
 
     // pio_clear_instruction_memory(pio);
-    if (pio_config.program) {
-        // pio_remove_program_and_unclaim_sm(pio_config.program, pio_config.pio, pio_config.sm, pio_config.offset);
-        pio_remove_program(pio_config.pio, pio_config.program, pio_config.offset);
-        pio_config.program = 0;
-    }
+    pio_config_release(&pio_config); // stop and free a previous capture's program
 
     mem_free((uint8_t*)la_buf);
 

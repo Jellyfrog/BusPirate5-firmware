@@ -50,7 +50,7 @@ void pio_hw2wire_init(uint sda, uint scl, uint dir_sda, uint dir_scl, uint baudr
 
 void pio_hw2wire_cleanup(void) {
     // pio_remove_program_and_unclaim_sm(&hw2wire_program, pio_config.pio, pio_config.sm, pio_config.offset);
-    pio_remove_program(pio_config.pio, pio_config.program, pio_config.offset);
+    pio_config_release(&pio_config);
 }
 
 bool pio_hw2wire_check_error(PIO pio, uint sm) {

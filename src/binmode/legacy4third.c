@@ -48,6 +48,7 @@
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 #include "pirate/psu.h"
+#include "pio_config.h"
 
 const char legacy4third_mode_name[] = "Legacy Binary Mode for Flashrom and AVRdude";
 
@@ -170,8 +171,7 @@ static void aux_clock_stop(void) {
     if (aux_clock_sm < 0) {
         return;
     }
-    pio_sm_set_enabled(PIO_MODE_PIO, aux_clock_sm, false);
-    pio_remove_program(PIO_MODE_PIO, &aux_clock_program, aux_clock_offset);
+    pio_sm_release(PIO_MODE_PIO, aux_clock_sm, &aux_clock_program, aux_clock_offset);
     pio_sm_unclaim(PIO_MODE_PIO, aux_clock_sm);
     aux_clock_sm = -1;
     bio_set_function(LEGACY_AUX_CLOCK_PIN, GPIO_FUNC_SIO);

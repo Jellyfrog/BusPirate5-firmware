@@ -22,6 +22,7 @@
 #include "hardware/clocks.h"
 #include "hw1wire.pio.h"
 #include "pirate/hw1wire_pio.h"
+#include "pio_config.h"
 
 struct owobj owobj;
 
@@ -46,8 +47,7 @@ void onewire_init(uint pin, uint dir) {
 
 void onewire_cleanup(void) {
     // pio_remove_program_and_unclaim_sm(&onewire_program, owobj.pio, owobj.sm, owobj.offset);
-    pio_sm_set_enabled(owobj.pio, owobj.sm, false);
-    pio_remove_program(owobj.pio, &onewire_program, owobj.offset);
+    pio_sm_release(owobj.pio, owobj.sm, &onewire_program, owobj.offset);
 }
 
 void onewire_set_fifo_thresh(uint thresh) {

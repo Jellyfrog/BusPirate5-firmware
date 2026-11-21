@@ -78,6 +78,7 @@ void sniff_handler(struct command_result* res) {
     bool success = pio_claim_free_sm_and_add_program_for_gpio_range(
         &spisnif_program, &pio_config.pio, &pio_config.sm, &pio_config.offset, bio2bufiopin[BIO0], 3, true);
     hard_assert(success);
+    pio_config.program = &spisnif_program;
     printf("PIO: pio=%d, sm=%d, offset=%d\r\n", PIO_NUM(pio_config.pio), pio_config.sm, pio_config.offset);
     spisnif_program_init(
         pio_config.pio, pio_config.sm, pio_config.offset, bio2bufiopin[BIO3], bio2bufiopin[BIO0], bio2bufiopin[BIO2]);
@@ -85,6 +86,7 @@ void sniff_handler(struct command_result* res) {
     success = pio_claim_free_sm_and_add_program_for_gpio_range(
         &spisnif_2_program, &pio_config_d1.pio, &pio_config_d1.sm, &pio_config_d1.offset, bio2bufiopin[BIO0], 3u, true);
     hard_assert(success);
+    pio_config_d1.program = &spisnif_2_program;
     printf("PIO: pio=%d, sm=%d, offset=%d\r\n", PIO_NUM(pio_config_d1.pio), pio_config_d1.sm, pio_config_d1.offset);
     spisnif_2_program_init(pio_config_d1.pio,
                            pio_config_d1.sm,
@@ -112,9 +114,11 @@ void sniff_handler(struct command_result* res) {
             break;
         }
     }
-    pio_remove_program_and_unclaim_sm(&spisnif_program, pio_config.pio, pio_config.sm, pio_config.offset);
+    pio_config_release(&pio_config);
+    pio_sm_unclaim(pio_config.pio, pio_config.sm);
 
-    pio_remove_program_and_unclaim_sm(&spisnif_2_program, pio_config_d1.pio, pio_config_d1.sm, pio_config_d1.offset);
+    pio_config_release(&pio_config_d1);
+    pio_sm_unclaim(pio_config_d1.pio, pio_config_d1.sm);
 
     system_bio_update_purpose_and_label(false, BIO0, BP_PIN_MODE, 0);
     system_bio_update_purpose_and_label(false, BIO1, BP_PIN_MODE, 0);
