@@ -155,11 +155,26 @@ void hw2w_sniff(struct command_result* res){
     system_bio_update_purpose_and_label(false, BIO2, BP_PIN_MODE, 0);
     system_bio_update_purpose_and_label(false, BIO3, BP_PIN_MODE, 0);
 
+    // Stop all four state machines before freeing their programs. Removing a program
+    // does not stop its SM: the mode setup below reuses that instruction memory and
+    // re-inits only SM0, so SM1-3 ran whatever landed at their PC and kept driving
+    // BIO2/BIO3 into the target after the sniffer exited.
+    pio_sm_set_enabled(pio_main.pio, pio_main.sm, false);
+    pio_sm_set_enabled(pio_data.pio, pio_data.sm, false);
+    pio_sm_set_enabled(pio_start.pio, pio_start.sm, false);
+    pio_sm_set_enabled(pio_stop.pio, pio_stop.sm, false);
+
     //remove sniff PIO programs
     pio_remove_program(pio_main.pio, pio_main.program, pio_main.offset);
     pio_remove_program(pio_data.pio, pio_data.program, pio_data.offset);
     pio_remove_program(pio_start.pio, pio_start.program, pio_start.offset);
     pio_remove_program(pio_stop.pio, pio_stop.program, pio_stop.offset);
+
+    // hand the event pins back to plain GPIO inputs, buffers to input
+    bio_set_function(BIO2, GPIO_FUNC_SIO);
+    bio_set_function(BIO3, GPIO_FUNC_SIO);
+    bio_input(BIO2);
+    bio_input(BIO3);
 
     //on exit, restore the I2C PIO
     hw2wire_setup_exc();
