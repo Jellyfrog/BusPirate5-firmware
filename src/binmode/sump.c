@@ -47,6 +47,7 @@
 #include "command_struct.h" //needed for same reason as bytecode and needs same fix
 #include "modes.h"
 #include "pirate/psu.h"
+#include "commands/global/w_psu.h"
 #include "binmode/logicanalyzer.h"
 #include "tusb.h"
 
@@ -549,6 +550,26 @@ enum {
 
 static uint8_t state = SLA_STATE_IDLE;
 
+// true while SUMP itself turned on the PSU, so it only ever turns off its own supply
+static bool sump_psu_owned = false;
+
+// Power VOUT for a logic analyzer session only when nothing else is using the Bus
+// Pirate: HiZ mode and the PSU off. A supply the user set up (e.g. 1.8V for a target)
+// is never changed, and the current limit always stays on.
+static void sump_psu_claim(void) {
+    if (system_config.mode != HIZ || psu_status.enabled) {
+        return;
+    }
+    sump_psu_owned = (psucmd_enable(3.3f, 100.0f, false, 100) == PSU_OK);
+}
+
+static void sump_psu_release(void) {
+    if (sump_psu_owned) {
+        psucmd_disable();
+        sump_psu_owned = false;
+    }
+}
+
 void sump_logic_analyzer_setup(void) {
     system_config.binmode_usb_rx_queue_enable = false;
     system_config.binmode_usb_tx_queue_enable = false;
@@ -560,9 +581,10 @@ void sump_logic_analyzer_cleanup(void) {
     if (state != SLA_STATE_IDLE) {
         logic_analyzer_cleanup();
     }
-    if (system_config.mode == 0 || !tud_cdc_n_connected(0)) {
-        psu_disable();
-    }
+    // back to IDLE, or re-entering SUMP with the port open would resume in SERVICE
+    // on the analyzer buffer that was just freed
+    state = SLA_STATE_IDLE;
+    sump_psu_release();
 }
 
 const char sump_logic_analyzer_name[] = "SUMP logic analyzer";
@@ -576,9 +598,7 @@ void sump_logic_analyzer_service(void) {
             if (tud_cdc_n_connected(1)) {
                 cdc_sump_init();
                 cdc_sump_init_connect();
-                if (system_config.mode == 0 || !tud_cdc_n_connected(0)) {
-                    psu_enable(3.3, 100, true, 100);
-                }
+                sump_psu_claim();
                 state = SLA_STATE_SERVICE;
             }
             break;
@@ -586,9 +606,7 @@ void sump_logic_analyzer_service(void) {
             cdc_sump_task();
             if (!tud_cdc_n_connected(1) || button_get(0)) {
                 logic_analyzer_cleanup();
-                if (system_config.mode == 0 || !tud_cdc_n_connected(0)) {
-                    psu_disable();
-                }
+                sump_psu_release();
                 state = SLA_STATE_IDLE;
             }
             break;

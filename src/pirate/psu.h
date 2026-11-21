@@ -65,12 +65,12 @@ void psu_init(void);
  * @brief Enable PSU with specified voltage, current limit, and protection settings.
  * @param volts                   Requested output voltage (0.8V to 5.0V)
  * @param current                 Current limit in mA (0 to 500mA)
- * @param current_limit_enabled   false to disable current limiting, true to enforce
+ * @param current_limit_override  true to disable current limiting, false to enforce it
  * @param voltage_lag_percent     Undervoltage threshold percentage (1-100, 100=disabled)
  * @return PSU_OK on success, or PSU_ERROR_* code on failure
  * @warning Temporarily engages current override during startup to prevent inrush trips.
  */
-uint32_t psu_enable(float volts, float current, bool current_limit_enabled, uint8_t voltage_lag_percent);
+uint32_t psu_enable(float volts, float current, bool current_limit_override, uint8_t voltage_lag_percent);
 
 /**
  * @brief Disable PSU and reset hardware to safe state.
