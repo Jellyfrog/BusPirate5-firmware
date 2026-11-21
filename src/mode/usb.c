@@ -52,6 +52,7 @@ WARNING: DREG'S BULLSHIT CODE X-)
 #include "hardware/timer.h"
 #include "pico/stdlib.h"
 #include "pico_usb_sniffer_lite.pio.h"
+#include "pio_config.h"
 
 #define BIO_TRIGGER_INDEX BIO0
 #define BIO_DP_INDEX BIO1
@@ -1227,17 +1228,15 @@ static void usb_pio_stop(void)
 {
     if (usb_sampler_sm >= 0)
     {
-        pio_sm_set_enabled(USB_SAMPLER_PIO, usb_sampler_sm, false);
+        pio_sm_release(USB_SAMPLER_PIO, usb_sampler_sm, &usb_sampler_program, 0);
         pio_sm_unclaim(USB_SAMPLER_PIO, usb_sampler_sm);
-        pio_remove_program(USB_SAMPLER_PIO, &usb_sampler_program, 0);
         usb_sampler_sm = -1;
     }
 
     if (usb_start_sm >= 0)
     {
-        pio_sm_set_enabled(USB_START_PIO, usb_start_sm, false);
+        pio_sm_release(USB_START_PIO, usb_start_sm, &tar_pio1_program, usb_start_offset);
         pio_sm_unclaim(USB_START_PIO, usb_start_sm);
-        pio_remove_program(USB_START_PIO, &tar_pio1_program, usb_start_offset);
         usb_start_sm = -1;
         gpio_set_function(START_INDEX, GPIO_FUNC_SIO);
     }

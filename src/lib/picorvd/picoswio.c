@@ -28,8 +28,12 @@ const char* ch32swio_addr_to_regname(uint8_t addr);
 
 //------------------------------------------------------------------------------
 void ch32vswio_cleanup(void){
-  pio_remove_program_and_unclaim_sm(&singlewire_program, pio_config.pio, pio_config.sm, pio_config.offset);
-  pio_config.offset=0;
+  // program == NULL: never loaded (exit before the host connected) or already
+  // released. Unclaiming a zeroed config used to release SM0 of pio0, which other
+  // code owns.
+  if (pio_config.program == NULL) return;
+  pio_config_release(&pio_config);
+  pio_sm_unclaim(pio_config.pio, pio_config.sm);
 }
 
 void ch32vswio_reset(int pin, int dirpin) {
@@ -44,10 +48,11 @@ void ch32vswio_reset(int pin, int dirpin) {
   gpio_set_slew_rate     (dirpin, GPIO_SLEW_RATE_SLOW);
   gpio_set_function      (dirpin, GPIO_FUNC_PIO0);
 
-  if(pio_config.offset) ch32vswio_cleanup(); //TODO: fix this hack...
+  ch32vswio_cleanup(); // no-op unless a previous reset loaded the program
 
   bool success = pio_claim_free_sm_and_add_program_for_gpio_range(&singlewire_program, &pio_config.pio, &pio_config.sm, &pio_config.offset, dirpin, 9, true);
   hard_assert(success);
+  pio_config.program = &singlewire_program;
   printf("PIO: pio=%d, sm=%d, offset=%d\r\n", PIO_NUM(pio_config.pio), pio_config.sm, pio_config.offset);
 
   // Reset PIO module

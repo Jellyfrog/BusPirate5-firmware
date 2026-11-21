@@ -227,10 +227,8 @@ uint32_t i2s_setup_exc(void) {
 
 // Cleanup any configuration on exit.
 void i2s_cleanup(void) {
-    pio_sm_set_enabled(i2s_pio_config_out.pio, i2s_pio_config_out.sm, false);
-    pio_sm_set_enabled(i2s_pio_config_in.pio, i2s_pio_config_in.sm, false);
-    pio_remove_program(i2s_pio_config_out.pio, i2s_pio_config_out.program, i2s_pio_config_out.offset);
-    pio_remove_program(i2s_pio_config_in.pio, i2s_pio_config_in.program, i2s_pio_config_in.offset);
+    pio_config_release(&i2s_pio_config_out);
+    pio_config_release(&i2s_pio_config_in);
     // 1. Disable any hardware you used
     bio_init();
 

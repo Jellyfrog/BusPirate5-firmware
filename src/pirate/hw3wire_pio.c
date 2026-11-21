@@ -50,7 +50,7 @@ void pio_hw3wire_init(uint mosi, uint sclk, uint miso, uint32_t freq) {
 
 void pio_hw3wire_cleanup(void) {
     // pio_remove_program_and_unclaim_sm(&hw3wire_program, pio_config.pio, pio_config.sm, pio_config.offset);
-    pio_remove_program(pio_config.pio, pio_config.program, pio_config.offset);
+    pio_config_release(&pio_config);
 }
 
 static inline void pio_hw3wire_wait_idle(PIO pio, uint sm) {

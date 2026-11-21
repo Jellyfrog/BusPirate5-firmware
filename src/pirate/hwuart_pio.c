@@ -96,10 +96,8 @@ void hwuart_pio_init(const hduart_mode_config *mode_cfg) {
 void hwuart_pio_deinit(void) {
     // pio_remove_program_and_unclaim_sm(&uart_rx_program, pio_config_rx.pio, pio_config_rx.sm, pio_config_rx.offset);
     // pio_remove_program_and_unclaim_sm(&uart_tx_program, pio_config_tx.pio, pio_config_tx.sm, pio_config_tx.offset);
-    pio_sm_set_enabled(pio_config_rx.pio, pio_config_rx.sm, false);
-    pio_sm_set_enabled(pio_config_tx.pio, pio_config_tx.sm, false);
-    pio_remove_program(pio_config_rx.pio, pio_config_rx.program, pio_config_rx.offset);
-    pio_remove_program(pio_config_tx.pio, pio_config_tx.program, pio_config_tx.offset);
+    pio_config_release(&pio_config_rx);
+    pio_config_release(&pio_config_tx);
 }
 
 bool hwuart_pio_read(uint32_t* raw, uint8_t* cooked) {

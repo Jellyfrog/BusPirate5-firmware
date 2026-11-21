@@ -62,6 +62,7 @@ WARNING: BULLSHIT CODE X-)
 #include "pico/stdlib.h"
 #include "pico_ps2_sniffer.pio.h"
 #include "commands/global/w_psu.h"
+#include "pio_config.h"
 
 #define RING_BUFF_MAX_ENTRIES 800
 
@@ -1230,20 +1231,16 @@ static void ps2_pio_unload(void)
     pio_set_irq0_source_mask_enabled(pio1, 0x0F00, false);
     pio_set_irq0_source_enabled(pio1, (enum pio_interrupt_source)(pis_sm0_rx_fifo_not_empty + kbd_h2d_sm), false);
 
-    pio_sm_set_enabled(pio0, kbd_inh_sm, false);
-    pio_sm_set_enabled(pio0, kbd_sm, false);
+    pio_sm_release(pio0, kbd_inh_sm, &inhibited_signal_program, offset_inh);
+    pio_sm_release(pio0, kbd_sm, &device_to_host_program, offset_kbd);
     pio_sm_unclaim(pio0, kbd_inh_sm);
     pio_sm_unclaim(pio0, kbd_sm);
-    pio_remove_program(pio0, &inhibited_signal_program, offset_inh);
-    pio_remove_program(pio0, &device_to_host_program, offset_kbd);
     pio0_hw->irq = 0x3; // the inhibit detector's two flags
 
-    pio_sm_set_enabled(pio1, kbd_h2d_sm, false);
-    pio_sm_set_enabled(pio1, kbd_idle_sm, false);
+    pio_sm_release(pio1, kbd_h2d_sm, &host_to_device_program, offset_kbd_h2d);
+    pio_sm_release(pio1, kbd_idle_sm, &idle_signal_program, offset_idle);
     pio_sm_unclaim(pio1, kbd_h2d_sm);
     pio_sm_unclaim(pio1, kbd_idle_sm);
-    pio_remove_program(pio1, &host_to_device_program, offset_kbd_h2d);
-    pio_remove_program(pio1, &idle_signal_program, offset_idle);
     pio1_hw->irq = 0x1; // the idle detector's flag
 
     bio_input(BIO_AUX_D2H_JMP_GPIO);
@@ -1285,7 +1282,7 @@ static bool ps2_pio_load(void)
     offset_inh = pio_add_program(pio0, &inhibited_signal_program);
     if (!pio_can_add_program(pio0, &device_to_host_program))
     {
-        pio_remove_program(pio0, &inhibited_signal_program, offset_inh);
+        pio_program_unload(pio0, &inhibited_signal_program, offset_inh); // not started yet
         printf("pio0 has no room, not sniffing\r\n");
         return false;
     }

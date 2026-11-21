@@ -76,12 +76,8 @@ int nec_tx_init(uint pin_num, uint32_t mod_freq) {
 void nec_tx_deinit(uint pin_num) {
     //pio_remove_program_and_unclaim_sm(&nec_carrier_burst_program, pio_config_burst.pio, pio_config_burst.sm, pio_config_burst.offset);
     //pio_remove_program_and_unclaim_sm(&nec_carrier_control_program, pio_config_control.pio, pio_config_control.sm, pio_config_control.offset);
-    pio_remove_program(pio_config_burst.pio, pio_config_burst.program, pio_config_burst.offset);
-    pio_remove_program(pio_config_control.pio, pio_config_control.program, pio_config_control.offset);
-    pio_sm_clear_fifos(pio_config_burst.pio, pio_config_burst.sm);
-    pio_sm_clear_fifos(pio_config_control.pio, pio_config_control.sm);
-    pio_sm_restart(pio_config_burst.pio, pio_config_burst.sm);
-    pio_sm_restart(pio_config_control.pio, pio_config_control.sm);
+    pio_config_release(&pio_config_burst);
+    pio_config_release(&pio_config_control);
 }
 
 

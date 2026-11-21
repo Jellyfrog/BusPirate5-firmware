@@ -40,7 +40,7 @@ bool ow_init(uint8_t bits_per_word, uint bufdir, uint inpin) {
 
 // cleanup PIO when done
 void ow_cleanup(void) {
-    pio_remove_program(ow.pio, &onewire_program, ow.offset);
+    pio_sm_release(ow.pio, ow.sm, &onewire_program, ow.offset);
 }
 
 // Send a binary word on the bus (LSB first).
