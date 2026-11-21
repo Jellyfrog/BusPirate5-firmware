@@ -155,6 +155,7 @@ static char const * const zh_cn[T_LAST_ITEM_ALWAYS_AT_THE_END]={
     [ T_UART_OPEN_WITH_READ            ] = NULL,
     [ T_UART_CLOSE                     ] = NULL,
     [ T_UART_NO_DATA_READ              ] = NULL,
+    [ T_UART_TX_BLOCKED                ] = NULL,
     [ T_UART_NO_DATA_TIMEOUT           ] = NULL,
     [ T_HWI2C_SPEED_MENU               ] = NULL,
     [ T_HWI2C_SPEED_MENU_1             ] = NULL,

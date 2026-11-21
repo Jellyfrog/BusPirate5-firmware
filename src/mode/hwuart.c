@@ -42,6 +42,7 @@
 #include "commands/uart/bridge.h"
 #include "commands/uart/monitor.h"
 #include "commands/uart/glitch.h"
+#include "pirate/button.h"
 #include "lib/bp_args/bp_cmd.h"
 
 static struct _uart_mode_config mode_config;
@@ -361,11 +362,31 @@ void hwuart_close(struct _bytecode* result, struct _bytecode* next) {
     result->data_message = GET_T(T_UART_CLOSE);
 }
 
+// How long the TX FIFO may sit full or busy before we give up. With CTS flow control
+// the UART only sends while CTS is asserted; an unwired or stuck CTS used to block
+// forever with no way out but a replug. Allow 1 s plus the time to send a full FIFO
+// (32 frames of up to 12 bits) at the current baud rate.
+static uint32_t hwuart_tx_timeout_us(void) {
+    uint32_t baud = mode_config.baudrate_actual ? mode_config.baudrate_actual : 1;
+    return 1000000u + (uint32_t)((32ull * 12u * 1000000u) / baud);
+}
+
+bool hwuart_putc_timeout(uint8_t c) {
+    uint32_t start = time_us_32();
+    uint32_t timeout = hwuart_tx_timeout_us();
+    while (!uart_is_writable(M_UART_PORT)) {
+        if ((time_us_32() - start) > timeout || button_get(0)) {
+            return false;
+        }
+    }
+    uart_putc_raw(M_UART_PORT, c);
+    return true;
+}
+
 void hwuart_write(struct _bytecode* result, struct _bytecode* next) {       
-    if (mode_config.blocking) {
-        uart_putc_raw(M_UART_PORT, result->out_data);
-    } else {
-        uart_putc_raw(M_UART_PORT, result->out_data);
+    if (!hwuart_putc_timeout(result->out_data)) {
+        result->error = SERR_ERROR; // halts the rest of the line
+        result->error_message = GET_T(T_UART_TX_BLOCKED);
     }
 }
 
@@ -466,7 +487,14 @@ void hwuart_help(void) {
 }
 
 void hwuart_wait_done(void) {
-    uart_tx_wait_blocking(M_UART_PORT);
+    // uart_tx_wait_blocking() never returns while CTS holds data in the FIFO
+    uint32_t start = time_us_32();
+    uint32_t timeout = hwuart_tx_timeout_us();
+    while (uart_get_hw(M_UART_PORT)->fr & UART_UARTFR_BUSY_BITS) {
+        if ((time_us_32() - start) > timeout || button_get(0)) {
+            return;
+        }
+    }
 }
 
 uint32_t hwuart_get_speed(void) {

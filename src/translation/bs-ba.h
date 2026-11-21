@@ -155,6 +155,7 @@ static char const * const bs_ba[T_LAST_ITEM_ALWAYS_AT_THE_END]={
     [ T_UART_OPEN_WITH_READ            ] = NULL,
     [ T_UART_CLOSE                     ] = NULL,
     [ T_UART_NO_DATA_READ              ] = "Nema podataka za čiranje",
+    [ T_UART_TX_BLOCKED                ] = NULL,
     [ T_UART_NO_DATA_TIMEOUT           ] = "Timeout čitanja podataka",
     [ T_HWI2C_SPEED_MENU               ] = "I2C brzina",
     [ T_HWI2C_SPEED_MENU_1             ] = "1kHz do 1000kHz",

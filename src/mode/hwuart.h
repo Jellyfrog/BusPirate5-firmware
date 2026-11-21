@@ -135,6 +135,13 @@ void hwuart_restore_speed(void);
 bool hwuart_flow_control_enabled(void);
 
 /**
+ * @brief Send one byte, giving up if the TX FIFO stays full (CTS held) too long.
+ * @param c  Byte to send
+ * @return true if queued, false on timeout or button press
+ */
+bool hwuart_putc_timeout(uint8_t c);
+
+/**
  * @brief Perform UART mode sanity checks.
  * @return true if all checks pass, false otherwise
  */

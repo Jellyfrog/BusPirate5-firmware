@@ -9,6 +9,9 @@
 #include "bpio_uart.h"
 #include "bpio_reader.h"
 #include "bpio_transactions.h"
+#include "bytecode.h"
+#include "command_struct.h"
+#include "mode/hwuart.h"
 
 // Maximum bytes to read in async handler
 #define BPIO_MAX_READ_SIZE 512
@@ -22,7 +25,10 @@ uint32_t bpio_hwuart_transaction(struct bpio_data_request_t *request, flatbuffer
     if(request->bytes_write > 0) {
         if(request->debug) printf("[UART] Writing %d bytes\r\n", request->bytes_write);
         for(uint32_t i = 0; i < request->bytes_write; i++) {
-            uart_putc_raw(M_UART_PORT, flatbuffers_uint8_vec_at(data_write, i));
+            if(!hwuart_putc_timeout(flatbuffers_uint8_vec_at(data_write, i))) {
+                if(request->debug) printf("[UART] TX blocked at byte %d\r\n", i);
+                return true; // error: CTS held the transmitter
+            }
         }
     }
 
