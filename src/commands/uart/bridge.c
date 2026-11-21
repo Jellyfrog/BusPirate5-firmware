@@ -19,12 +19,14 @@
 #include "tusb.h"
 #include "binmode/binmodes.h"
 
-static const char* const usage[] = { "bridge\t[-h(elp)] [-t(oolbar)]",
+static const char* const usage[] = { "bridge\t[-h(elp)] [-t(oolbar)] [-b(aud follow)]",
                                      "Transparent UART bridge:%s bridge",
+                                     "Follow host baud rate (esptool):%s bridge -b",
                                      "Exit:%s press Bus Pirate button, send a serial BREAK, or send a BPIO2 request" };
 
 static const bp_command_opt_t bridge_opts[] = {
     { "toolbar", 't', BP_ARG_NONE, NULL, T_HELP_UART_BRIDGE_TOOLBAR },
+    { "baud", 'b', BP_ARG_NONE, NULL, T_HELP_UART_BRIDGE_BAUD },
     { 0 }
 };
 
@@ -56,7 +58,23 @@ void uart_bridge_handler(struct command_result* res) {
     printf("%s%s%s\r\n", ui_term_color_notice(), GET_T(T_HELP_UART_BRIDGE_EXIT), ui_term_color_reset());
     bio_put(M_UART_RTS, 0);
     usb_cdc_terminal_break_take(); // ignore a BREAK that arrived before the bridge started
+
+    // With -b the target UART follows the baud rate the host sets on the terminal port,
+    // like a USB serial adapter. esptool needs this to switch to a faster rate.
+    bool follow_baud = bp_cmd_find_flag(&uart_bridge_def, 'b');
+    bool baud_changed = false;
+    uint32_t baud_seq = usb_cdc_terminal_baud_seq(); // only changes made from now on
+
     while (true) {
+        if (follow_baud && baud_seq != usb_cdc_terminal_baud_seq()) {
+            baud_seq = usb_cdc_terminal_baud_seq();
+            uint32_t baud = usb_cdc_terminal_baud();
+            if (baud) {
+                uart_tx_wait_blocking(M_UART_PORT); // finish sending at the old rate
+                hwuart_set_speed_temporary(baud);
+                baud_changed = true;
+            }
+        }
         char c;
         if (rx_fifo_try_get(&c)) {
             uart_putc_raw(M_UART_PORT, c);
@@ -80,6 +98,11 @@ void uart_bridge_handler(struct command_result* res) {
         }
     }
     bio_put(M_UART_RTS, 1);
+
+    if (baud_changed) {
+        uart_tx_wait_blocking(M_UART_PORT);
+        hwuart_restore_speed();
+    }
 
     if (toolbar_paused) {
         toolbar_resume_updates();

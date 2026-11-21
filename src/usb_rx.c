@@ -181,6 +181,29 @@ bool usb_cdc_terminal_break_take(void) {
     return true;
 }
 
+// Baud rate the host last set on the terminal port. Written by the USB stack on
+// core1; the sequence number is bumped after the rate is stored, so core0 sees a
+// change only once the new rate is in place.
+static volatile uint32_t cdc_terminal_baud = 0;
+static volatile uint32_t cdc_terminal_baud_seq = 0;
+
+void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding) {
+    if (itf == 0) {
+        cdc_terminal_baud = p_line_coding->bit_rate;
+        __dmb();
+        cdc_terminal_baud_seq++;
+    }
+}
+
+uint32_t usb_cdc_terminal_baud_seq(void) {
+    return cdc_terminal_baud_seq;
+}
+
+uint32_t usb_cdc_terminal_baud(void) {
+    __dmb();
+    return cdc_terminal_baud;
+}
+
 // Invoked when cdc when line state changed e.g connected/disconnected
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts) {
     BP_DEBUG_PRINT(BP_DEBUG_LEVEL_VERBOSE, BP_DEBUG_CAT_TEMP,
