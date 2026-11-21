@@ -213,10 +213,8 @@ inline void binmode_setup(void) {
 
     //voltage and current 
     if(binmodes[system_config.binmode_select].psu_en_voltage>0) {
-        bool i_override;
-        if(binmodes[system_config.binmode_select].psu_en_current==0) {
-            i_override = true;
-        }
+        // a current of 0 means no limit; any other value is enforced
+        bool i_override = (binmodes[system_config.binmode_select].psu_en_current == 0);
         psucmd_enable(binmodes[system_config.binmode_select].psu_en_voltage, binmodes[system_config.binmode_select].psu_en_current, i_override, 100);
         //system_pin_update_purpose_and_label(true, BP_VOUT, BP_PIN_VOUT, ui_const_pin_states[1]);
         //monitor_clear_current(); // reset current so the LCD gets all characters
