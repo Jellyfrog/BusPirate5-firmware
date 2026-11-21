@@ -677,8 +677,9 @@ uint32_t data_request(bpio_RequestPacket_table_t packet, flatcc_builder_t *B, ui
     else if(bpio_handler(&request, data_write, data_read)){
         bpio_DataResponse_data_read_truncate(B, data_buf_size); // drop the reserved bytes, they hold no data 
         static const char* request_error_msg = "Protocol request failed";
-        if(bpio_debug) printf("[Data Request] %s\r\n", request_error_msg);
-        error = request_error_msg;
+        // Handlers may name the failure; fall back to the generic message.
+        error = request.error ? request.error : request_error_msg;
+        if(bpio_debug) printf("[Data Request] %s\r\n", error);
     }
     bpio_DataResponse_data_read_end(B); // End the data read vector
         

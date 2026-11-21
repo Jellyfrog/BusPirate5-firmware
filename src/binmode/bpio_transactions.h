@@ -36,6 +36,7 @@ struct bpio_data_request_t {
     bool stop_main;                           /**< Assert stop/CS deassert */
     bool stop_alt;                            /**< Assert alternate stop */
     flatbuffers_uint8_vec_t bitwise_ops;      /**< Bitwise pin operations (2-wire/3-wire only) */
+    const char *error;                        /**< Set by a handler to report a specific failure reason */
 };
 
 /**
