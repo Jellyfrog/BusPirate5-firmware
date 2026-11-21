@@ -262,13 +262,13 @@ uint32_t hw2wire_get_speed(void) {
 // Flatbuffer/binary access functions
 //-----------------------------------------
 bool bpio_hw2wire_configure(bpio_mode_configuration_t *bpio_mode_config){
-    //set defaults, check range
-    hw2wire_mode_config.baudrate = 400; // default speed in kHz
-    if(hw2wire_mode_config.baudrate < 1 || hw2wire_mode_config.baudrate > 1000){
-        if(bpio_mode_config->debug) printf("[2WIRE] Invalid speed %d kHz\r\n", hw2wire_mode_config.baudrate);
+    // check the requested speed (the old code checked a constant it had just set)
+    uint32_t khz = bpio_mode_config->speed / 1000;
+    if(khz < 1 || khz > 1000){
+        if(bpio_mode_config->debug) printf("[2WIRE] Invalid speed %d kHz\r\n", khz);
         return false;
     }
-        
+
     if(bpio_mode_config->debug) printf("[2WIRE] Speed %d Hz\r\n", bpio_mode_config->speed);
     hw2wire_mode_config.baudrate=bpio_mode_config->speed/1000; // convert to kHz
     return true;  

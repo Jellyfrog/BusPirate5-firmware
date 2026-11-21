@@ -124,6 +124,19 @@ typedef struct _mode {
 
 extern struct _mode modes[MAXPROTO];
 
+/**
+ * @brief Leave the current mode and start new_mode. Every mode change goes through here.
+ * @details Runs the old mode's cleanup, returns all pins to a safe state, then runs the
+ *          new mode's setup_exc. If that fails, the new mode's cleanup runs and the Bus
+ *          Pirate is left in HiZ. The follow along logic analyzer is told either way.
+ *          The mode's setup dialog or BPIO configure must already have filled its config.
+ * @param new_mode    Index into modes[]
+ * @param keep_power  true: leave the PSU and pull-ups as they are (BPIO clients set
+ *                    them explicitly); false: turn them off, as the terminal always has
+ * @return true if new_mode is active, false if setup failed and HiZ is active
+ */
+bool mode_transition(uint32_t new_mode, bool keep_power);
+
 void nullfunc1(void);
 uint32_t nullfunc2(uint32_t c);
 uint32_t nullfunc3(void);

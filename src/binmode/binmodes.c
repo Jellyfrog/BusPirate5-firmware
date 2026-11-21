@@ -205,9 +205,9 @@ inline void binmode_setup(void) {
     }
     // optional reset to HiZ
     if(binmodes[system_config.binmode_select].reset_to_hiz) {
-        modes[system_config.mode].protocol_cleanup();
-        system_config.mode = 0;
-        modes[system_config.mode].protocol_setup();
+        // protocol_setup() is HiZ's (empty) dialog; the transition runs the real
+        // setup, so the old mode's PSU, pull-ups and aux outputs really are off
+        mode_transition(HIZ, false);
     }
 
     //voltage and current 
@@ -236,10 +236,14 @@ inline void binmode_service(void) {
         char c;
         if(rx_fifo_try_get(&c)){
             binmode_cleanup();
+            mode_transition(HIZ, false);
+            // back to the saved default binmode, not always binmode 0
             system_config.binmode_select = 0;
+            binmode_load_save_config(false);
+            if (system_config.binmode_select >= count_of(binmodes)) {
+                system_config.binmode_select = 0;
+            }
             binmode_setup();
-            system_config.mode = 0;
-            modes[system_config.mode].protocol_setup();
             return;
         }
     }
