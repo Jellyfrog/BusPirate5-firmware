@@ -88,6 +88,41 @@ void tx_tb_start(uint32_t len) {
     tx_tb_buf_ready = true;
 }
 
+// How long the USB TX buffer may stay full with DTR low before the terminal counts as
+// unread, and how long output is then dropped before the host is tried again.
+#define USB_TX_STALL_US 100000
+#define USB_TX_DROP_US 1000000
+
+// True while nothing reads the USB terminal port. DTR alone does not say that: esptool
+// leaves DTR and RTS low after its reset sequence and keeps reading (UART bridge with
+// -r/-g), and some hosts never raise DTR. Output is dropped only once the TX buffer
+// has stopped draining with DTR low, and the host is retried after a while.
+static bool usb_tx_no_reader(void) {
+    static uint32_t stall_start = 0; // 0: the TX buffer is draining
+    static uint32_t drop_start = 0;
+    static bool dropping = false;
+    uint32_t now = time_us_32();
+
+    if (tud_cdc_n_connected(0)) {
+        stall_start = 0;
+        dropping = false;
+    } else if (dropping) {
+        if (now - drop_start > USB_TX_DROP_US) {
+            // a host may have opened the port without raising DTR
+            dropping = false;
+            stall_start = 0;
+        }
+    } else if (tud_cdc_n_write_available(0) >= 64) {
+        stall_start = 0;
+    } else if (stall_start == 0) {
+        stall_start = now | 1; // never 0
+    } else if (now - stall_start > USB_TX_STALL_US) {
+        dropping = true;
+        drop_start = now;
+    }
+    return dropping;
+}
+
 /**
  * @brief Service the transmit FIFO and status bar updates
  * 
@@ -120,7 +155,10 @@ void tx_fifo_service(void) {
     char data[64];
     uint8_t i = 0;
 
-    if (system_config.terminal_usb_enable && !tud_cdc_n_connected(0)) {
+    // true when nothing reads the USB terminal (with USB off, nothing reads it at all)
+    bool no_reader = system_config.terminal_usb_enable ? usb_tx_no_reader() : true;
+
+    if (system_config.terminal_usb_enable && no_reader) {
         // No host. TinyUSB does not clear its TX buffer when DTR drops, and nobody
         // reads it, so write_available stays below 64 for good. Checking that first
         // left the flush below unreachable: tx_fifo filled and core0 blocked in
@@ -147,8 +185,9 @@ void tx_fifo_service(void) {
         case IDLE:
             bytes_available = spsc_queue_level(&tx_fifo);
             if (bytes_available) {
-                //flush if no host connected (prevents filling the FIFO and blocking Core0 when no terminal is attached)
-                if (!tud_cdc_n_connected(0)) {
+                // flush if no terminal reads the output (prevents filling the FIFO and blocking
+                // Core0 when no terminal is attached); the debug UART, when on, always does
+                if (no_reader && !system_config.terminal_uart_enable) {
                     spsc_queue_flush(&tx_fifo);
                     return;
                 }
