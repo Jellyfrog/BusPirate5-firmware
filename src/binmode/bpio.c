@@ -681,6 +681,10 @@ uint32_t data_request(bpio_RequestPacket_table_t packet, flatcc_builder_t *B, ui
         error = request.error ? request.error : request_error_msg;
         if(bpio_debug) printf("[Data Request] %s\r\n", error);
     }
+    else if(request.bytes_read_set && request.bytes_read_actual < data_buf_size) {
+        // The handler returned fewer bytes than were reserved (e.g. a 1-Wire ROM search)
+        bpio_DataResponse_data_read_truncate(B, data_buf_size - request.bytes_read_actual);
+    }
     bpio_DataResponse_data_read_end(B); // End the data read vector
         
     if (bpio_debug && request.bytes_read > 0 && !error) {
