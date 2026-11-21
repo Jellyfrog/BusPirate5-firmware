@@ -56,7 +56,12 @@ void uart_bridge_handler(struct command_result* res) {
     }
 
     printf("%s%s%s\r\n", ui_term_color_notice(), GET_T(T_HELP_UART_BRIDGE_EXIT), ui_term_color_reset());
-    bio_put(M_UART_RTS, 0);
+    // IO7 is only the UART's RTS line with flow control on; otherwise it is a free pin
+    // the user may be driving, so leave it alone.
+    bool flow_control = hwuart_flow_control_enabled();
+    if (flow_control) {
+        bio_put(M_UART_RTS, 0);
+    }
     usb_cdc_terminal_break_take(); // ignore a BREAK that arrived before the bridge started
 
     // With -b the target UART follows the baud rate the host sets on the terminal port,
@@ -97,7 +102,9 @@ void uart_bridge_handler(struct command_result* res) {
             break;
         }
     }
-    bio_put(M_UART_RTS, 1);
+    if (flow_control) {
+        bio_put(M_UART_RTS, 1);
+    }
 
     if (baud_changed) {
         uart_tx_wait_blocking(M_UART_PORT);

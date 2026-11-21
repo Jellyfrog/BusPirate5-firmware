@@ -479,6 +479,10 @@ uint32_t hwuart_set_speed_temporary(uint32_t baudrate) {
     return mode_config.baudrate_actual;
 }
 
+bool hwuart_flow_control_enabled(void) {
+    return mode_config.flow_control;
+}
+
 void hwuart_restore_speed(void) {
     mode_config.baudrate_actual = uart_set_baudrate(M_UART_PORT, mode_config.baudrate);
 }
