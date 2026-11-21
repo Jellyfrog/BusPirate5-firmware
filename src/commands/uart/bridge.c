@@ -50,8 +50,14 @@ const bp_command_def_t uart_bridge_def = {
 static bool bridge_get_pin(char flag, uint8_t* pin) {
     uint32_t value;
     *pin = BRIDGE_NO_PIN;
-    if (!bp_cmd_get_uint32(&uart_bridge_def, flag, &value)) {
+    if (!bp_cmd_find_flag(&uart_bridge_def, flag)) {
         return true; // not given
+    }
+    if (!bp_cmd_get_uint32(&uart_bridge_def, flag, &value)) {
+        // given without a number (e.g. "-r" or "-r x"): say so rather than bridging
+        // without the auto-reset pin the user asked for
+        printf("%sError:%s -%c needs an IO pin number\r\n", ui_term_color_error(), ui_term_color_reset(), flag);
+        return false;
     }
     if (value >= count_of(bio2bufiopin)) {
         printf("%sError:%s pin IO%d is invalid\r\n", ui_term_color_error(), ui_term_color_reset(), value);
@@ -147,13 +153,15 @@ void uart_bridge_handler(struct command_result* res) {
             baud_seq = usb_cdc_terminal_baud_seq();
             uint32_t baud = usb_cdc_terminal_baud();
             if (baud) {
-                uart_tx_wait_blocking(M_UART_PORT); // finish sending at the old rate
+                hwuart_wait_done(); // finish sending at the old rate
                 hwuart_set_speed_temporary(baud);
                 baud_changed = true;
             }
         }
         char c;
-        if (rx_fifo_try_get(&c)) {
+        // only take a byte when the TX FIFO has room: with flow control a deasserted CTS
+        // would otherwise block here for good, past the button and BREAK checks below
+        if (uart_is_writable(M_UART_PORT) && rx_fifo_try_get(&c)) {
             uart_putc_raw(M_UART_PORT, c);
         }
         if (uart_is_readable(M_UART_PORT)) {
@@ -189,7 +197,7 @@ void uart_bridge_handler(struct command_result* res) {
     }
 
     if (baud_changed) {
-        uart_tx_wait_blocking(M_UART_PORT);
+        hwuart_wait_done();
         hwuart_restore_speed();
     }
 
