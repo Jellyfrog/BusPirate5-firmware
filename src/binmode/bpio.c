@@ -264,7 +264,9 @@ uint32_t status_request(bpio_RequestPacket_table_t packet, flatcc_builder_t *B, 
 
         bpio_StatusResponse_mode_pin_labels_start(B);
         for (uint8_t i = 0; i < HW_PINS; i++) {
-            flatbuffers_string_ref_t label = flatbuffers_string_create_str(B, system_config.pin_labels[i]);
+            // Unclaimed pins have a NULL label; strlen(NULL) would read the boot ROM.
+            const char *pin_label = system_config.pin_labels[i] ? system_config.pin_labels[i] : "";
+            flatbuffers_string_ref_t label = flatbuffers_string_create_str(B, pin_label);
             bpio_StatusResponse_mode_pin_labels_push(B, label);
         }
         bpio_StatusResponse_mode_pin_labels_end(B);
