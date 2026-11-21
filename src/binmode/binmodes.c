@@ -40,6 +40,7 @@
 #include "usb_rx.h"
 #include "ui/ui_const.h"
 #include "commands/global/w_psu.h"
+#include "pirate/button.h"
 #include "ui/ui_term.h"
 #include "tusb.h"
 
@@ -174,7 +175,7 @@ const binmode_t binmodes[] = {
         .pullup_enabled = false,
         .psu_en_voltage = 5.0,
         .psu_en_current = 0,  
-        .button_to_exit = false,      
+        .button_to_exit = true,      
         .binmode_setup = irtoy_air_setup,
         .binmode_cleanup = irtoy_air_cleanup,
         .binmode_service = irtoy_air_service,
@@ -234,7 +235,7 @@ inline void binmode_service(void) {
     //exit on button press
     if(binmodes[system_config.binmode_select].button_to_exit) {
         char c;
-        if(rx_fifo_try_get(&c)){
+        if(rx_fifo_try_get(&c) || button_get(0)){
             binmode_cleanup();
             system_config.binmode_select = 0;
             binmode_setup();
