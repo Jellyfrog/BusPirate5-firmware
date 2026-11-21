@@ -26,6 +26,7 @@ uint32_t bpio_hwuart_transaction(struct bpio_data_request_t *request, flatbuffer
         if(request->debug) printf("[UART] Writing %d bytes\r\n", request->bytes_write);
         for(uint32_t i = 0; i < request->bytes_write; i++) {
             if(!hwuart_putc_timeout(flatbuffers_uint8_vec_at(data_write, i))) {
+                request->error = "UART TX blocked: CTS not asserted";
                 if(request->debug) printf("[UART] TX blocked at byte %d\r\n", i);
                 return true; // error: CTS held the transmitter
             }
