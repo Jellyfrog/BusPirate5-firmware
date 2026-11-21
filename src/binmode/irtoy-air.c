@@ -18,6 +18,7 @@
 #include "pirate/irio_pio.h"
 #include "pirate/bio.h"
 #include "pirate/psu.h"
+#include "pirate/button.h"
 
 
 #define MAX_UART_PKT 64
@@ -237,7 +238,7 @@ void irtoy_air_service(void){
     uint8_t air_buffer[512];
     bool frame_found=false;
     uint16_t air_cnt;
-    bool send_id;
+    bool send_id = true; // send the ID string to the first host that connects
 
     IR_PULSE pulse;
     pulse.always_LF = '\n';
@@ -251,8 +252,15 @@ void irtoy_air_service(void){
     //ideally we'd be co-op multitasking, but we're not
     //to multitask we'd need to make the buffer and air_buffer static
     //which would eat a lot of memory
-    //instead we just do a never ending loop here
+    //instead we loop here until the user asks to leave
     while(true){
+        // A key on the terminal or the button exits. Return without consuming the
+        // key: binmode_service() sees it and leaves the binmode, which also turns off
+        // the 5V supply this mode runs with the current limit overridden.
+        char key;
+        if (rx_fifo_try_peek(&key) || button_get(0)) {
+            return;
+        }
         //need to be careful about PIO fifo overflow here
         if (!tud_cdc_n_connected(CDC_INTF)) {
             irio_pio_rxtx_drain_fifo();
